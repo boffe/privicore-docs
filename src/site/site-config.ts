@@ -63,6 +63,7 @@ const SITE_PATH_PREFIXES = [
   "/assets/",
   "/images/",
   "/openapi.json",
+  "/agents.md",
 ];
 export function applyBasePath(content: string, basePath: string): string {
   if (!basePath) return content;
