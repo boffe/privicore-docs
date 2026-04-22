@@ -1,12 +1,7 @@
-/* Site-wide styles. Tuned to resemble Apidog's rendered docs layout:
-   light-first with a purple accent, GitHub-Light code highlighting, and
-   colored-left-border admonition boxes. Dark mode still supported via
-   prefers-color-scheme. */
+/* Site-wide styles. Light-first with a purple accent, GitHub-Light code
+   highlighting, and colored-left-border admonition boxes. Dark mode
+   supported via prefers-color-scheme. */
 
-/* Inter — Apidog references it in their font stack but never actually
-   loads it, so the render only matches on designers' machines that
-   happen to have Inter installed. We self-load it so every visitor
-   sees what their designers see. */
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
 :root {
@@ -16,7 +11,7 @@
   --topbar-height: 52px;
   --scalar-custom-header-height: var(--topbar-height);
 
-  /* Light (default) — Apidog's docs.privicore.com aesthetic. */
+  /* Light (default). */
   --color-bg: #ffffff;
   --color-panel: #fafbfc;
   --color-panel-2: #f6f8fa;
@@ -25,7 +20,7 @@
   --color-muted: #656d76;
   --color-border: #d0d7de;
   --color-border-muted: #eaeef2;
-  --color-accent: #8250df;         /* Apidog purple */
+  --color-accent: #8250df;
   --color-accent-hover: #6639b7;
   --color-accent-soft: #fbf7ff;    /* purple tint for link hovers, active nav */
 
@@ -41,9 +36,8 @@
   --adm-danger-bg: #ffebe9;
   --adm-danger-border: #cf222e;
 
-  /* Typography — Apidog's exact stacks. Inter is their primary face (we
-     self-load it above so it actually renders everywhere). The mono
-     stack matches theirs byte-for-byte. */
+  /* Typography. Inter is the primary face (self-loaded above so it
+     renders everywhere); the mono stack is the GitHub system stack. */
   --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
@@ -400,7 +394,7 @@ html.dark-mode .theme-toggle .icon-sun { display: block; }
 
 /* -------- Code -------- */
 
-/* Inline code — Apidog-style subtle tinted pill. */
+/* Inline code — subtle tinted pill. */
 .guide-content code {
   font-family: var(--font-mono);
   background: rgba(130, 80, 223, 0.08);
@@ -415,7 +409,7 @@ html.dark-mode .guide-content code {
   color: #d2a8ff;
 }
 
-/* Code blocks — GitHub-Light palette, matches Apidog's light theme. */
+/* Code blocks — GitHub-Light palette. */
 .guide-content pre {
   background: var(--color-panel-2);
   border: 1px solid var(--color-border-muted);

@@ -1,12 +1,10 @@
 /**
  * Builds the HTML shell that embeds Scalar's API reference against our
- * generated OpenAPI spec. Scalar renders the three-column Apidog-style
- * layout (nav | content | code sample) directly from the spec URL.
+ * generated OpenAPI spec. Scalar renders the three-column layout
+ * (nav | content | code sample) directly from the spec URL.
  *
  * Why Scalar:
  *   - Open source, actively maintained.
- *   - Out-of-the-box look matches the reference-docs-tradition Apidog
- *     also sits in.
  *   - Fully driven by OpenAPI so our probe → IR → OpenAPI → site
  *     pipeline stays end-to-end standards-compliant.
  *

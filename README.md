@@ -1,10 +1,10 @@
 # Privicore Doc Writer
 
 Generates the Privicore API documentation site from a live reference
-instance plus a curated editorial layer. Renders an Apidog-style
-three-column reference via [Scalar](https://scalar.com) and a set of
-editorial guide pages styled to match. Output is a static `dist/` that
-deploys to any host.
+instance plus a curated editorial layer. Renders a three-column API
+reference via [Scalar](https://scalar.com) and a set of editorial
+guide pages styled to match. Output is a static `dist/` that deploys
+to any host.
 
 ## Why this exists
 
@@ -30,9 +30,6 @@ at runtime — everything is static HTML plus the Scalar CDN script.
 privicore-doc-writer/
 ├── src/
 │   ├── config.ts               # env loader
-│   ├── apidog/                 # (dormant) retained in case we want to
-│   │   ├── client.ts           #   seed IR from an existing Apidog project
-│   │   └── types.ts            #   via export-openapi
 │   ├── probe/
 │   │   ├── http.ts             # HTTP helpers
 │   │   ├── ws.ts               # WebSocket awaiter for async-command acks
@@ -48,7 +45,7 @@ privicore-doc-writer/
 │   ├── site/
 │   │   ├── build.ts            # orchestrates dist/ generation
 │   │   ├── render-home.ts      # landing page template
-│   │   ├── render-reference.ts # Scalar shell template
+│   │   ├── render-reference.ts # Scalar reference-shell template
 │   │   ├── render-guide.ts     # editorial page template (+ admonition parser)
 │   │   ├── site-config.ts      # build-time URL substitution
 │   │   ├── theme-boilerplate.ts # shared <head> + toggle markup

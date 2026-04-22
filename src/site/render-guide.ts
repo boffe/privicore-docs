@@ -23,7 +23,7 @@ marked.use(markedHighlight({
   },
 }));
 
-// Apidog-style admonition blocks:
+// Admonition blocks:
 //
 //     :::info[Title optional]
 //     body markdown, supports paragraphs, code, links, etc.

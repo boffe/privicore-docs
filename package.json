@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Generates the Privicore API documentation site from a live reference instance and a curated editorial layer. Renders an Apidog-style three-column reference via Scalar plus MDX-style guide pages.",
+  "description": "Generates the Privicore API documentation site from a live reference instance and a curated editorial layer. Renders a three-column API reference via Scalar plus MDX-style guide pages.",
   "scripts": {
     "probe": "tsx src/cli/probe.ts",
     "build": "tsx src/cli/build.ts",

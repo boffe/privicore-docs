@@ -4,10 +4,10 @@
 
 A Node/TypeScript tool that probes a reachable Privicore CAB instance
 and generates a static API documentation site. The reference pages
-are rendered by Scalar (open-source, Apidog-style three-column
-layout); editorial guide pages are hand-authored markdown rendered
-with the same chrome. Output is a fully static `dist/` — no backend,
-no runtime dependency beyond a static host and Scalar's CDN.
+are rendered by Scalar (open-source, three-column layout); editorial
+guide pages are hand-authored markdown rendered with the same chrome.
+Output is a fully static `dist/` — no backend, no runtime dependency
+beyond a static host and Scalar's CDN.
 
 The probe deliberately exercises only happy paths + documented
 failure modes. This project is NOT a pentest tool.
@@ -50,11 +50,6 @@ See `README.md` for the tree and per-file purpose.
 - **marked** — the markdown → HTML renderer for guide pages. Kept
   minimal; swap to `markdown-it` without touching call sites if we
   outgrow it.
-
-The `src/apidog/` module is **dormant**. It was scaffolded for a
-possible Apidog export-based IR seeding flow, but we decided to own
-the full pipeline. Retained in case we ever want to pull legacy
-content forward. Not loaded by the build path.
 
 ## Secrets
 
