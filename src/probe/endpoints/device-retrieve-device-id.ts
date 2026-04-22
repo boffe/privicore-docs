@@ -1,51 +1,54 @@
 import type { EndpointDoc } from "../../ir/types.ts";
 import { openAuthenticatedSession } from "../auth.ts";
-import { probeGet, probePostForm } from "../http.ts";
+import { probePostForm, extractCommandId } from "../http.ts";
 import { recordExample } from "../recorder.ts";
 import type { EndpointProbe, ProbeContext } from "./index.ts";
 
 /**
- * Setup-chain probe: runs request-device-id internally to get a live
- * commandId, awaits its ack, then records the happy-path retrieval.
+ * Setup-chain probe: runs /device/request-unique-identifier internally to
+ * get a live commandId, awaits its ack, then records the happy-path
+ * retrieval via /device/retrieve-unique-identifier.
  */
 export const probeDeviceRetrieveDeviceId: EndpointProbe = {
   id: "device.retrieve-device-id",
-  summary: "Retrieve device id",
+  summary: "Retrieve device identifier",
   async run(ctx: ProbeContext): Promise<EndpointDoc> {
     const session = await openAuthenticatedSession(ctx);
     try {
       const requested = await probePostForm(
-        "/device/request-device-id",
+        "/device/request-unique-identifier",
         { deviceName: `probe-device-${Date.now()}` },
         session.token,
       );
-      const commandId = (requested.body as { commandId?: string })?.commandId;
-      if (!commandId) throw new Error(`retrieve-device-id setup: request-device-id returned no commandId`);
+      const commandId = extractCommandId(requested.body);
+      if (!commandId) throw new Error(`retrieve-unique-identifier setup: request-unique-identifier returned no commandId`);
       await session.ws.awaitCabAck(commandId);
 
-      const response = await probeGet(`/device/retrieve-device-id/${commandId}`, session.token);
-      if (response.status !== 200) throw new Error(`retrieve-device-id expected 200, got ${response.status}`);
+      const form = { id: commandId };
+      const response = await probePostForm("/device/retrieve-unique-identifier", form, session.token);
+      if (response.status !== 200) throw new Error(`retrieve-unique-identifier expected 200, got ${response.status}`);
 
       return {
         id: "device.retrieve-device-id",
-        summary: "Retrieve device id",
-        method: "GET",
-        path: "/device/retrieve-device-id/{commandId}",
+        summary: "Retrieve device identifier",
+        method: "POST",
+        path: "/device/retrieve-unique-identifier",
         phase: "sync",
         auth: "authorization-token",
         parameters: [
-          { in: "path", name: "commandId", required: true, type: "string", description: "Command id from `request-device-id`." },
+          { in: "form", name: "id", required: true, type: "string", description: "Command id from `request-unique-identifier`." },
         ],
         responses: [
-          { status: 200, description: "Device id assigned.", schema: { type: "object", properties: { deviceId: { type: "string" } } } },
+          { status: 200, description: "Device identifier assigned.", schema: { type: "object", properties: { deviceIdentifier: { type: "string" } } } },
         ],
         examples: [recordExample({
           name: "Happy path",
-          method: "GET",
-          path: `/device/retrieve-device-id/${commandId}`,
-          bodyType: "none",
+          method: "POST",
+          path: "/device/retrieve-unique-identifier",
+          bodyType: "form",
+          body: form,
           response,
-          note: "Recorded after running request-device-id as setup.",
+          note: "Recorded after running request-unique-identifier as setup.",
         })],
         sourceRun: { tool: "probe", at: new Date().toISOString() },
       };

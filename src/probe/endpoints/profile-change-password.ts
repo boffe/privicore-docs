@@ -1,5 +1,5 @@
 import type { EndpointDoc } from "../../ir/types.ts";
-import { probePostForm } from "../http.ts";
+import { probePostForm, extractCommandId } from "../http.ts";
 import { recordExample } from "../recorder.ts";
 import { createThrowawayProfile } from "../fixtures.ts";
 import type { EndpointProbe, ProbeContext } from "./index.ts";
@@ -15,12 +15,12 @@ export const probeProfileChangePassword: EndpointProbe = {
   summary: "Change password",
   destructive: true,
   async run(ctx: ProbeContext): Promise<EndpointDoc> {
-    const throwaway = await createThrowawayProfile(ctx.wsUrl);
+    const throwaway = await createThrowawayProfile(ctx.apiUrl, ctx.wsUrl);
     try {
       const form = { currentPassword: throwaway.password, newPassword: `${throwaway.password}-rotated` };
       const response = await probePostForm("/profile/change-password", form, throwaway.session.token);
       if (response.status !== 202) throw new Error(`change-password expected 202, got ${response.status}`);
-      const commandId = (response.body as { commandId?: string })?.commandId;
+      const commandId = extractCommandId(response.body);
       if (!commandId) throw new Error(`change-password: no commandId`);
       const ack = await throwaway.session.ws.awaitCabAck(commandId);
 

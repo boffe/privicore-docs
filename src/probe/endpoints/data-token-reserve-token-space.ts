@@ -1,6 +1,6 @@
 import type { EndpointDoc } from "../../ir/types.ts";
 import { openAuthenticatedSession } from "../auth.ts";
-import { probePostForm } from "../http.ts";
+import { probePostForm, extractCommandId } from "../http.ts";
 import { recordExample } from "../recorder.ts";
 import type { EndpointProbe, ProbeContext } from "./index.ts";
 
@@ -10,10 +10,10 @@ export const probeDataTokenReserveTokenSpace: EndpointProbe = {
   async run(ctx: ProbeContext): Promise<EndpointDoc> {
     const session = await openAuthenticatedSession(ctx);
     try {
-      const form = { context: "probe/reserve", ttl: "300" };
+      const form = { context: "probe/reserve", ttl: "5" };
       const response = await probePostForm("/data-token/reserve-token-space", form, session.token);
       if (response.status !== 202) throw new Error(`reserve-token-space expected 202, got ${response.status}`);
-      const commandId = (response.body as { commandId?: string })?.commandId;
+      const commandId = extractCommandId(response.body);
       if (!commandId) throw new Error(`reserve-token-space: no commandId in response body`);
       const ack = await session.ws.awaitCabAck(commandId);
 
@@ -26,7 +26,7 @@ export const probeDataTokenReserveTokenSpace: EndpointProbe = {
         auth: "authorization-token",
         parameters: [
           { in: "form", name: "context", required: true, type: "string", description: "Free-form label attached to the reservation.", example: "probe/reserve" },
-          { in: "form", name: "ttl", required: true, type: "integer", description: "Time-to-live in seconds.", example: 300 },
+          { in: "form", name: "ttl", required: true, type: "integer", description: "Time-to-live in seconds.", example: 5 },
         ],
         responses: [
           { status: 202, description: "Reservation accepted; await the `X-DPT-CAB-ID` WebSocket ack.", schema: { type: "object", properties: { commandId: { type: "string" } }, required: ["commandId"] } },

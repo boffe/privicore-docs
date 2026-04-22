@@ -698,7 +698,7 @@
       "summary": "Retrieve CAB public key",
       "description": "Returns the engine's own signed public key, used when you need to encrypt content *to* the engine or verify server-signed responses. Same 200-hex-character format as profile keys.",
       "method": "GET",
-      "path": "/public-key/retrieve-cab-public-key",
+      "path": "/dptcab/public-key",
       "phase": "sync",
       "auth": "authorization-token",
       "responses": [
@@ -723,7 +723,7 @@
           "name": "Happy path",
           "request": {
             "method": "GET",
-            "path": "/public-key/retrieve-cab-public-key",
+            "path": "/dptcab/public-key",
             "bodyType": "none"
           },
           "response": {
@@ -745,7 +745,7 @@
       "summary": "Register OAuth application",
       "description": "Registers a third-party OAuth application under the caller's profile. Returns an `applicationId` that can be fed to [`retrieve-oauth-app-configuration`](#tag/oauth/operation/oauth.retrieve-oauth-app-configuration) for the application's client credentials. See the [OAuth applications](/guides/oauth-applications.html) guide for the end-to-end flow.",
       "method": "POST",
-      "path": "/oauth/register-oauth-application",
+      "path": "/profile/oauth-application-register",
       "phase": "async-command",
       "auth": "authorization-token",
       "parameters": [
@@ -793,7 +793,7 @@
           "name": "Happy path",
           "request": {
             "method": "POST",
-            "path": "/oauth/register-oauth-application",
+            "path": "/profile/oauth-application-register",
             "bodyType": "form",
             "body": {
               "name": "my-integration",
@@ -824,8 +824,8 @@
       "id": "oauth.retrieve-oauth-app-configuration",
       "summary": "Retrieve OAuth app configuration",
       "description": "Returns the `clientId`, `clientSecret`, configured `redirectUri`, and granted `scopes` for a registered OAuth application. The `clientSecret` is sensitive — treat it like an API key.",
-      "method": "GET",
-      "path": "/oauth/retrieve-oauth-app-configuration/{applicationId}",
+      "method": "POST",
+      "path": "/profile/retrieve-oauth-application-configuration",
       "phase": "sync",
       "auth": "authorization-token",
       "parameters": [
@@ -900,8 +900,8 @@
       "id": "oauth.request-oauth-app-authorization-code",
       "summary": "Request OAuth app authorization code",
       "description": "The user-consent leg of the OAuth authorization-code flow. In interactive integrations, this is typically surfaced via a browser redirect rather than a direct API call — but the wire call is documented here for completeness. On success the engine redirects the user to the application's configured `redirectUri` with a one-shot authorization code attached.",
-      "method": "POST",
-      "path": "/oauth/request-oauth-app-authorization-code",
+      "method": "GET",
+      "path": "/profile/oauth-application-request-authorization-code",
       "phase": "sync",
       "auth": "authorization-token",
       "parameters": [
@@ -945,7 +945,7 @@
       "summary": "Obtain OAuth app access token",
       "description": "Server-to-server exchange. Authenticate with HTTP Basic using `base64(clientId:clientSecret)` — **not** the authorization code, which goes in the form body. See the [OAuth applications](/guides/oauth-applications.html) guide for the end-to-end flow.",
       "method": "POST",
-      "path": "/oauth/obtain-oauth-app-access-token",
+      "path": "/oauth-application/obtain-access-token",
       "phase": "sync",
       "auth": "oauth",
       "parameters": [
@@ -1000,7 +1000,7 @@
           "name": "Happy path",
           "request": {
             "method": "POST",
-            "path": "/oauth/obtain-oauth-app-access-token",
+            "path": "/oauth-application/obtain-access-token",
             "bodyType": "form",
             "body": {
               "grantType": "authorization_code",
@@ -1030,7 +1030,7 @@
       "summary": "Refresh OAuth app access token",
       "description": "Trade a valid refresh token for a new access + refresh token pair. The previous refresh token is rotated; the previous access token (if still valid) is invalidated immediately.",
       "method": "POST",
-      "path": "/oauth/refresh-oauth-app-access-token",
+      "path": "/oauth-application/refresh-access-token",
       "phase": "sync",
       "auth": "oauth",
       "parameters": [
@@ -1092,7 +1092,7 @@
       "summary": "OAuth application list",
       "description": "Returns every OAuth application registered under the authenticated profile, with scope and last-used metadata. Useful for account-management UIs that let users review and revoke integrations.",
       "method": "GET",
-      "path": "/oauth/oauth-application-list",
+      "path": "/profile/retrieve-oauth-application-list",
       "phase": "sync",
       "auth": "authorization-token",
       "responses": [
@@ -1117,7 +1117,7 @@
           "name": "Happy path",
           "request": {
             "method": "GET",
-            "path": "/oauth/oauth-application-list",
+            "path": "/profile/retrieve-oauth-application-list",
             "bodyType": "none"
           },
           "response": {
@@ -1152,9 +1152,9 @@
       "summary": "Check server health",
       "description": "Cheap liveness check. Returns 200 with a short status payload when the engine is up. Used as the hello-world call in [Getting started](/guides/getting-started.html).",
       "method": "GET",
-      "path": "/utility/check-server-health",
+      "path": "/health",
       "phase": "sync",
-      "auth": "authorization-token",
+      "auth": "public",
       "responses": [
         {
           "status": 200,
@@ -1195,8 +1195,8 @@
       "id": "utility.request-command-id-status",
       "summary": "Request command id status",
       "description": "Inspect the current state of a command id without subscribing to the WebSocket. `command_status: 1` means still in flight, `2` means accepted/succeeded, `3` means rejected. Useful for one-shot scripts or for reconciling after a WebSocket reconnect.",
-      "method": "GET",
-      "path": "/utility/request-command-id-status/{commandId}",
+      "method": "POST",
+      "path": "/request-status/{commandId}",
       "phase": "sync",
       "auth": "authorization-token",
       "parameters": [
@@ -1255,7 +1255,7 @@
       "summary": "Request device id",
       "description": "First step in the device-onboarding chain. See [Device management](/guides/device-management.html).",
       "method": "POST",
-      "path": "/device/request-device-id",
+      "path": "/device/request-unique-identifier",
       "phase": "async-command",
       "auth": "authorization-token",
       "parameters": [
@@ -1287,7 +1287,7 @@
           "name": "Happy path",
           "request": {
             "method": "POST",
-            "path": "/device/request-device-id",
+            "path": "/device/request-unique-identifier",
             "bodyType": "form",
             "body": {
               "deviceName": "phone-a"
@@ -1505,7 +1505,7 @@
       "id": "device.configure-device-meta",
       "summary": "Configure device meta",
       "method": "POST",
-      "path": "/device/configure-device-meta",
+      "path": "/device/configure-meta",
       "phase": "async-command",
       "auth": "authorization-token",
       "parameters": [
@@ -1547,7 +1547,7 @@
       "summary": "Remove device",
       "description": "Invalidates the device's credentials and deregisters any specialised role it held. See [Device management](/guides/device-management.html#removing-a-device).",
       "method": "POST",
-      "path": "/device/remove-device",
+      "path": "/device/remove",
       "phase": "async-command",
       "auth": "authorization-token",
       "parameters": [
@@ -1576,7 +1576,7 @@
       "summary": "Register storage device",
       "description": "After approval ([`approve-device`](#tag/device/operation/device.approve-device)), call this to register the device in the storage fan-out. See [Storage device management](/guides/storage-device-management.html).",
       "method": "POST",
-      "path": "/storage/register-storage-device",
+      "path": "/storage/register",
       "phase": "async-command",
       "auth": "authorization-token",
       "parameters": [
@@ -1625,7 +1625,7 @@
       "summary": "Remove storage",
       "description": "Stops fan-out to this device. Existing chunks on the device's disk are not reclaimed by the engine — handle decommissioning separately.",
       "method": "POST",
-      "path": "/storage/remove-storage",
+      "path": "/storage/remove",
       "phase": "async-command",
       "auth": "authorization-token",
       "parameters": [
@@ -1654,7 +1654,7 @@
       "summary": "Register authenticator",
       "description": "After approval, call this to make the device eligible to receive ballots. See [Voting-gated operations](/guides/voting-gated-operations.html).",
       "method": "POST",
-      "path": "/verified-authenticator/register-authenticator",
+      "path": "/verified-authenticator/register",
       "phase": "async-command",
       "auth": "authorization-token",
       "parameters": [
@@ -1683,7 +1683,7 @@
       "summary": "Create voting configuration",
       "description": "Defines a strategy and ballot deadline that policies can reference. Omit `deviceIdentifiers` to dispatch ballots to every registered authenticator.",
       "method": "POST",
-      "path": "/verified-authenticator/voting-configuration/create",
+      "path": "/verified-authenticator/voting-configuration/register",
       "phase": "async-command",
       "auth": "authorization-token",
       "parameters": [
@@ -1736,7 +1736,7 @@
       "summary": "Register policy",
       "description": "Links a voting configuration to one or more system events. `configuration` must be non-empty — provide at least one meaningful key. `applyingEventIds` comes from [`list-policy-templates`](#tag/policy/operation/policy.list-policy-templates).",
       "method": "POST",
-      "path": "/policy/register-policy",
+      "path": "/policy/register",
       "phase": "async-command",
       "auth": "authorization-token",
       "parameters": [
@@ -1786,7 +1786,7 @@
       "summary": "Activate policy",
       "description": "Once active, the gated events are held for a voting pool until it resolves.",
       "method": "POST",
-      "path": "/policy/activate-policy",
+      "path": "/policy/activate",
       "phase": "async-command",
       "auth": "authorization-token",
       "parameters": [
@@ -1815,7 +1815,7 @@
       "summary": "Deactivate policy",
       "description": "Stops gating future events without deleting the policy configuration.",
       "method": "POST",
-      "path": "/policy/deactivate-policy",
+      "path": "/policy/deactivate",
       "phase": "async-command",
       "auth": "authorization-token",
       "parameters": [
@@ -2149,7 +2149,7 @@
       "summary": "Generate QR token for authorization",
       "description": "Returns a short-lived token payload suitable for rendering as a QR code. Mobile authenticator apps scan it to pair with the profile without the three-step device-onboarding chain.",
       "method": "POST",
-      "path": "/profile/generate-qr-token-for-authorization",
+      "path": "/profile/generate-token-qr",
       "phase": "sync",
       "auth": "authorization-token",
       "responses": [
@@ -2180,8 +2180,8 @@
       "id": "profile.retrieve-token-expiry",
       "summary": "Retrieve token expiry",
       "description": "Useful for clients that schedule reauthorisation before a token lapses.",
-      "method": "GET",
-      "path": "/profile/retrieve-token-expiry",
+      "method": "POST",
+      "path": "/profile/authorization-token/expiry",
       "phase": "sync",
       "auth": "authorization-token",
       "responses": [

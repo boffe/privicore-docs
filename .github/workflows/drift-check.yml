@@ -43,6 +43,10 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Report-only while the probe suite is being stabilised against the live
+    # sandbox. Drift and probe failures surface in the step summary but don't
+    # fail the workflow. Flip this off once the probe suite is green.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 

@@ -1,6 +1,6 @@
 import type { EndpointDoc } from "../../ir/types.ts";
 import { openAuthenticatedSession } from "../auth.ts";
-import { probePostForm } from "../http.ts";
+import { probePostForm, extractCommandId } from "../http.ts";
 import { recordExample } from "../recorder.ts";
 import { storeSmallPayload } from "../fixtures.ts";
 import type { EndpointProbe, ProbeContext } from "./index.ts";
@@ -15,7 +15,7 @@ export const probeDataTokenConfigureInformationSecurityRiskMeta: EndpointProbe =
       const form = { token: stored.permanentToken, classification: "confidential", retentionDays: "365" };
       const response = await probePostForm("/data-token/configure-information-security-risk-meta", form, session.token);
       if (response.status !== 202) throw new Error(`configure-information-security-risk-meta expected 202, got ${response.status}`);
-      const commandId = (response.body as { commandId?: string })?.commandId;
+      const commandId = extractCommandId(response.body);
       if (!commandId) throw new Error(`configure-information-security-risk-meta: no commandId`);
       const ack = await session.ws.awaitCabAck(commandId);
 

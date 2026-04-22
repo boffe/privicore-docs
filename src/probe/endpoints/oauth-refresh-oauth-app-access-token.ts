@@ -1,10 +1,10 @@
 import type { EndpointDoc } from "../../ir/types.ts";
 import { openAuthenticatedSession } from "../auth.ts";
-import { probeGet, probePostForm, probePostFormBasic } from "../http.ts";
+import { probeGet, probePostForm, probePostFormBasic, probePostFormRawBasic, extractCommandId } from "../http.ts";
 import { recordExample } from "../recorder.ts";
 import type { EndpointProbe, ProbeContext } from "./index.ts";
 
-/** Full chain: register app → consent → obtain → refresh. */
+/** Full chain: register app → retrieve config → request code → retrieve code → obtain tokens → refresh. */
 export const probeOauthRefreshOauthAppAccessToken: EndpointProbe = {
   id: "oauth.refresh-oauth-app-access-token",
   summary: "Refresh OAuth app access token",
@@ -12,7 +12,7 @@ export const probeOauthRefreshOauthAppAccessToken: EndpointProbe = {
     const session = await openAuthenticatedSession(ctx);
     try {
       const register = await probePostForm(
-        "/oauth/register-oauth-application",
+        "/profile/oauth-application-register",
         {
           name: `probe-refresh-${Date.now()}`,
           redirectUri: "https://probe.example.com/oauth/callback",
@@ -20,27 +20,51 @@ export const probeOauthRefreshOauthAppAccessToken: EndpointProbe = {
         },
         session.token,
       );
-      const regAck = await session.ws.awaitCabAck((register.body as { commandId?: string })?.commandId!);
-      const applicationId = (regAck.body as { applicationId?: string } | null)?.applicationId
-        ?? (regAck.body as { id?: string } | null)?.id;
-      if (!applicationId) throw new Error(`refresh setup: ack had no applicationId`);
+      const applicationId = extractCommandId(register.body);
+      if (!applicationId) throw new Error(`refresh setup: register returned no commandId`);
+      await session.ws.awaitCabAck(applicationId);
 
-      const cfg = await probeGet(`/oauth/retrieve-oauth-app-configuration/${applicationId}`, session.token);
+      const cfg = await probePostForm(
+        "/profile/retrieve-oauth-application-configuration",
+        { applicationId },
+        session.token,
+      );
       const clientId = (cfg.body as { clientId?: string })?.clientId;
       const clientSecret = (cfg.body as { clientSecret?: string })?.clientSecret;
-      if (!clientId || !clientSecret) throw new Error(`refresh setup: configuration had no clientId/clientSecret`);
+      if (!clientId || !clientSecret) throw new Error(`refresh setup: config missing clientId/clientSecret`);
 
-      const consent = await probePostForm("/oauth/request-oauth-app-authorization-code", { clientId, scopes: "data-token:read", state: "probe" }, session.token);
-      const code = extractCode(consent);
-      if (!code) throw new Error(`refresh setup: consent leg did not return a code`);
+      const nonce = `probe-${Date.now()}`;
+      const consent = await probeGet(
+        "/profile/oauth-application-request-authorization-code",
+        session.token,
+        { client_id: clientId, nonce, "scope[]": "all" },
+      );
+      const reqCmdId = extractCommandId(consent.body);
+      if (!reqCmdId) throw new Error(`refresh setup: authorization-code request returned no commandId`);
+      await session.ws.awaitCabAck(reqCmdId);
 
-      const obtained = await probePostFormBasic("/oauth/obtain-oauth-app-access-token", { grantType: "authorization_code", code }, clientId, clientSecret);
+      const retrieve = await probePostFormBasic(
+        "/oauth-application/retrieve-authorization-code",
+        { id: reqCmdId, nonce },
+        clientId,
+        clientSecret,
+      );
+      const authorizationCode = (retrieve.body as { authorizationCode?: string })?.authorizationCode;
+      if (!authorizationCode) throw new Error(`refresh setup: retrieve-authorization-code returned no authorizationCode`);
+
+      const obtained = await probePostFormBasic(
+        "/oauth-application/obtain-access-token",
+        { authorization_code: authorizationCode },
+        clientId,
+        clientSecret,
+      );
+      const accessToken = (obtained.body as { token?: string })?.token;
       const refreshToken = (obtained.body as { refreshToken?: string })?.refreshToken;
-      if (!refreshToken) throw new Error(`refresh setup: obtain did not return a refreshToken`);
+      if (!accessToken || !refreshToken) throw new Error(`refresh setup: obtain did not return token + refreshToken`);
 
-      const form = { grantType: "refresh_token", refreshToken };
-      const response = await probePostFormBasic("/oauth/refresh-oauth-app-access-token", form, clientId, clientSecret);
-      if (response.status !== 200) throw new Error(`refresh-oauth-app-access-token expected 200, got ${response.status}`);
+      const form = { refresh_token: refreshToken };
+      const response = await probePostFormRawBasic("/oauth-application/refresh-access-token", form, accessToken);
+      if (response.status !== 200) throw new Error(`refresh-access-token expected 200, got ${response.status}: ${response.rawBody.slice(0, 200)}`);
 
       const redacted = redactTokens(response);
 
@@ -48,25 +72,25 @@ export const probeOauthRefreshOauthAppAccessToken: EndpointProbe = {
         id: "oauth.refresh-oauth-app-access-token",
         summary: "Refresh OAuth app access token",
         method: "POST",
-        path: "/oauth/refresh-oauth-app-access-token",
+        path: "/oauth-application/refresh-access-token",
         phase: "sync",
         auth: "oauth",
         parameters: [
-          { in: "form", name: "grantType", required: true, type: "string", example: "refresh_token" },
-          { in: "form", name: "refreshToken", required: true, type: "string" },
+          { in: "header", name: "Authorization", required: true, type: "string", description: "`Basic <current-access-token>` — the raw access token, not base64(clientId:clientSecret)." },
+          { in: "form", name: "refresh_token", required: true, type: "string" },
         ],
         responses: [
-          { status: 200, description: "Fresh access + refresh token pair issued.", schema: { type: "object", properties: { accessToken: { type: "string" }, tokenType: { type: "string" }, expiresIn: { type: "integer" }, refreshToken: { type: "string" }, scope: { type: "string" } } } },
-          { status: 401, description: "Bad Basic-auth, or refresh token already used / revoked." },
+          { status: 200, description: "Fresh access + refresh token pair issued.", schema: { type: "object", properties: { token: { type: "string" }, refreshToken: { type: "string" }, expiresAt: { type: "string" } } } },
+          { status: 401, description: "Bad Basic-auth header, or refresh token already used / revoked." },
         ],
         examples: [recordExample({
           name: "Happy path",
           method: "POST",
-          path: "/oauth/refresh-oauth-app-access-token",
+          path: "/oauth-application/refresh-access-token",
           bodyType: "form",
-          body: { grantType: "refresh_token", refreshToken: `${refreshToken.slice(0, 6)}…<redacted>` },
+          body: { refresh_token: `${refreshToken.slice(0, 6)}…<redacted>` },
           response: redacted,
-          note: "Authenticated with Basic base64(clientId:clientSecret). Tokens redacted.",
+          note: "Authenticated with `Basic <access-token>`. Tokens redacted in recording.",
         })],
         sourceRun: { tool: "probe", at: new Date().toISOString() },
       };
@@ -76,25 +100,11 @@ export const probeOauthRefreshOauthAppAccessToken: EndpointProbe = {
   },
 };
 
-function extractCode(consent: { status: number; headers: Record<string, string>; body: unknown }): string | undefined {
-  const loc = consent.headers["location"] ?? consent.headers["Location"];
-  if (loc) {
-    const m = loc.match(/[?&]code=([^&]+)/);
-    if (m) return decodeURIComponent(m[1]!);
-  }
-  const body = consent.body;
-  if (body && typeof body === "object" && "code" in body) {
-    const code = (body as { code?: unknown }).code;
-    if (typeof code === "string") return code;
-  }
-  return undefined;
-}
-
 function redactTokens(response: { status: number; headers: Record<string, string>; body: unknown; rawBody: string }): typeof response {
   const body = response.body;
   if (body && typeof body === "object") {
     const copy = { ...(body as Record<string, unknown>) };
-    for (const key of ["accessToken", "refreshToken"]) {
+    for (const key of ["token", "accessToken", "refreshToken"]) {
       if (typeof copy[key] === "string") {
         const s = copy[key] as string;
         copy[key] = s.length > 10 ? `${s.slice(0, 6)}…<redacted>` : "<redacted>";

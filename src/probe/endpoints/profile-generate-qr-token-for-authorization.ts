@@ -9,19 +9,19 @@ export const probeProfileGenerateQrToken: EndpointProbe = {
   summary: "Generate QR token for authorization",
   async run(ctx: ProbeContext): Promise<EndpointDoc> {
     const token = await authenticate(ctx);
-    const response = await probePostForm("/profile/generate-qr-token-for-authorization", {}, token);
+    const response = await probePostForm("/profile/generate-token-qr", {}, token);
     if (response.status !== 200) throw new Error(`generate-qr-token expected 200, got ${response.status}`);
     return {
       id: "profile.generate-qr-token-for-authorization",
       summary: "Generate QR token for authorization",
       method: "POST",
-      path: "/profile/generate-qr-token-for-authorization",
+      path: "/profile/generate-token-qr",
       phase: "sync",
       auth: "authorization-token",
       responses: [
         { status: 200, description: "QR token + TTL.", schema: { type: "object", properties: { qrToken: { type: "string" }, expiresAt: { type: "string" } } } },
       ],
-      examples: [recordExample({ name: "Happy path", method: "POST", path: "/profile/generate-qr-token-for-authorization", bodyType: "none", response, note: "QR token is single-use and time-limited." })],
+      examples: [recordExample({ name: "Happy path", method: "POST", path: "/profile/generate-token-qr", bodyType: "none", response, note: "QR token is single-use and time-limited." })],
       sourceRun: { tool: "probe", at: new Date().toISOString() },
     };
   },

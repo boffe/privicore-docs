@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import type { EndpointDoc } from "../../ir/types.ts";
 import { openAuthenticatedSession } from "../auth.ts";
-import { probePostForm } from "../http.ts";
+import { probePostForm, extractCommandId } from "../http.ts";
 import { recordExample } from "../recorder.ts";
 import { reserveTokenSpace } from "../fixtures.ts";
 import type { EndpointProbe, ProbeContext } from "./index.ts";
@@ -24,7 +24,7 @@ export const probeDataTokenExchangeDataForToken: EndpointProbe = {
       const form = { temporaryTokenSpace: reservation.temporaryToken, data: dataB64 };
       const response = await probePostForm("/data-token/exchange-data-for-token", form, session.token);
       if (response.status !== 202) throw new Error(`exchange-data-for-token expected 202, got ${response.status}`);
-      const commandId = (response.body as { commandId?: string })?.commandId;
+      const commandId = extractCommandId(response.body);
       if (!commandId) throw new Error(`exchange-data-for-token: no commandId`);
       const ack = await session.ws.awaitCabAck(commandId);
 

@@ -212,9 +212,27 @@ function normalizeForDrift(ep: EndpointDoc) {
       .map((p) => ({ in: p.in, name: p.name, required: p.required, type: p.type }))
       .sort((a, b) => (a.in + a.name).localeCompare(b.in + b.name)),
     responses: (ep.responses ?? [])
-      .map((r) => ({ status: r.status, schema: r.schema }))
+      .map((r) => ({ status: r.status, schema: stripEditorial(r.schema) }))
       .sort((a, b) => a.status - b.status),
   };
+}
+
+/**
+ * Strip editorial-only fields from a JSON schema so structural drift
+ * comparison doesn't fire when a human adds a description/example to a
+ * committed schema that the probe doesn't (and shouldn't) regenerate.
+ */
+function stripEditorial(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripEditorial);
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (k === "description" || k === "example" || k === "examples" || k === "title") continue;
+      out[k] = stripEditorial(v);
+    }
+    return out;
+  }
+  return value;
 }
 
 function writeDriftSummary(

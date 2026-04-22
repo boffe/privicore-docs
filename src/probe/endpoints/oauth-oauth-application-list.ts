@@ -9,19 +9,19 @@ export const probeOauthOauthApplicationList: EndpointProbe = {
   summary: "OAuth application list",
   async run(ctx: ProbeContext): Promise<EndpointDoc> {
     const token = await authenticate(ctx);
-    const response = await probeGet("/oauth/oauth-application-list", token);
+    const response = await probeGet("/profile/retrieve-oauth-application-list", token);
     if (response.status !== 200) throw new Error(`oauth-application-list expected 200, got ${response.status}`);
     return {
       id: "oauth.oauth-application-list",
       summary: "OAuth application list",
       method: "GET",
-      path: "/oauth/oauth-application-list",
+      path: "/profile/retrieve-oauth-application-list",
       phase: "sync",
       auth: "authorization-token",
       responses: [
         { status: 200, description: "List of applications.", schema: { type: "object", properties: { items: { type: "array" }, meta: { type: "object" } } } },
       ],
-      examples: [recordExample({ name: "Happy path", method: "GET", path: "/oauth/oauth-application-list", bodyType: "none", response })],
+      examples: [recordExample({ name: "Happy path", method: "GET", path: "/profile/retrieve-oauth-application-list", bodyType: "none", response })],
       sourceRun: { tool: "probe", at: new Date().toISOString() },
     };
   },

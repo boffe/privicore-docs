@@ -1,15 +1,18 @@
 import type { EndpointDoc } from "../../ir/types.ts";
 import { openAuthenticatedSession } from "../auth.ts";
-import { probePostForm } from "../http.ts";
+import { probeGet, probePostForm, extractCommandId } from "../http.ts";
 import { recordExample } from "../recorder.ts";
 import type { EndpointProbe, ProbeContext } from "./index.ts";
 
 /**
- * Registers a throwaway app, then invokes the consent leg with our
- * authenticated session. The response is typically a 302 redirect
- * carrying the authorization code, or a 2xx with the code in the
- * body. Recording captures whichever shape the server returns so the
- * reference is honest about the live behaviour.
+ * Step 3 of the OAuth code-grant flow. Registers a throwaway app,
+ * retrieves its clientId via the single-use config endpoint, then
+ * issues the authorization-code request.
+ *
+ * Wire: GET `/profile/oauth-application-request-authorization-code`
+ * with `client_id`, `nonce`, and `scope[]` as query parameters. The
+ * response body is the commandId (bare string or single-element
+ * array) whose WS ack carries the pending authorization.
  */
 export const probeOauthRequestOauthAppAuthorizationCode: EndpointProbe = {
   id: "oauth.request-oauth-app-authorization-code",
@@ -17,9 +20,8 @@ export const probeOauthRequestOauthAppAuthorizationCode: EndpointProbe = {
   async run(ctx: ProbeContext): Promise<EndpointDoc> {
     const session = await openAuthenticatedSession(ctx);
     try {
-      // Register a throwaway app to get a clientId.
       const register = await probePostForm(
-        "/oauth/register-oauth-application",
+        "/profile/oauth-application-register",
         {
           name: `probe-consent-${Date.now()}`,
           redirectUri: "https://probe.example.com/oauth/callback",
@@ -27,37 +29,52 @@ export const probeOauthRequestOauthAppAuthorizationCode: EndpointProbe = {
         },
         session.token,
       );
-      const registerCmdId = (register.body as { commandId?: string })?.commandId;
-      if (!registerCmdId) throw new Error(`consent setup: register-oauth-application returned no commandId`);
-      const ack = await session.ws.awaitCabAck(registerCmdId);
-      const applicationId = (ack.body as { applicationId?: string } | null)?.applicationId
-        ?? (ack.body as { id?: string } | null)?.id;
-      if (!applicationId) throw new Error(`consent setup: ack body had no applicationId`);
+      const applicationId = extractCommandId(register.body);
+      if (!applicationId) throw new Error(`consent setup: register returned no commandId`);
+      await session.ws.awaitCabAck(applicationId);
 
-      // Pull config for the clientId.
-      const cfg = await probePostForm(`/oauth/retrieve-oauth-app-configuration/${applicationId}`, {}, session.token);
+      const cfg = await probePostForm(
+        "/profile/retrieve-oauth-application-configuration",
+        { applicationId },
+        session.token,
+      );
       const clientId = (cfg.body as { clientId?: string })?.clientId ?? "<unknown>";
 
-      const form = { clientId, scopes: "data-token:read", state: "probe-state" };
-      const response = await probePostForm("/oauth/request-oauth-app-authorization-code", form, session.token);
+      const nonce = `probe-${Date.now()}`;
+      const query = { client_id: clientId, nonce, "scope[]": "all" };
+      const response = await probeGet(
+        "/profile/oauth-application-request-authorization-code",
+        session.token,
+        query,
+      );
+      if (response.status !== 200 && response.status !== 202) {
+        throw new Error(`request-authorization-code expected 200 or 202, got ${response.status}`);
+      }
 
       return {
         id: "oauth.request-oauth-app-authorization-code",
         summary: "Request OAuth app authorization code",
-        method: "POST",
-        path: "/oauth/request-oauth-app-authorization-code",
-        phase: "sync",
+        method: "GET",
+        path: "/profile/oauth-application-request-authorization-code",
+        phase: "async-command",
         auth: "authorization-token",
         parameters: [
-          { in: "form", name: "clientId", required: true, type: "string" },
-          { in: "form", name: "scopes", required: true, type: "string" },
-          { in: "form", name: "state", required: false, type: "string", description: "Opaque CSRF token echoed on redirect." },
+          { in: "query", name: "client_id", required: true, type: "string" },
+          { in: "query", name: "nonce", required: true, type: "string", description: "Per-request opaque value, replayed back to `/oauth-application/retrieve-authorization-code`." },
+          { in: "query", name: "scope[]", required: true, type: "string", description: "Scope value, repeated for multiple scopes (PHP-style array syntax)." },
         ],
         responses: [
-          { status: 302, description: "Redirect to `redirectUri` with `?code=…&state=…` appended." },
-          { status: 200, description: "Code returned inline (some flows)." },
+          { status: 202, description: "Authorization-code request accepted; await the `X-DPT-CAB-ID` ack, then exchange the commandId for the real authorization code via `/oauth-application/retrieve-authorization-code`." },
         ],
-        examples: [recordExample({ name: response.status === 302 ? "Consent redirect" : "Inline response", method: "POST", path: "/oauth/request-oauth-app-authorization-code", bodyType: "form", body: form, response, note: "Probe captures whatever the server returns; browser-based consent UIs may differ." })],
+        examples: [recordExample({
+          name: "Happy path",
+          method: "GET",
+          path: "/profile/oauth-application-request-authorization-code",
+          bodyType: "none",
+          body: query,
+          response,
+          note: "Registered a throwaway app as setup.",
+        })],
         sourceRun: { tool: "probe", at: new Date().toISOString() },
       };
     } finally {

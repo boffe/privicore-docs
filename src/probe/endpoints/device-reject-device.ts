@@ -1,6 +1,6 @@
 import type { EndpointDoc } from "../../ir/types.ts";
 import { openAuthenticatedSession } from "../auth.ts";
-import { probeGet, probePostForm } from "../http.ts";
+import { probePostForm, extractCommandId } from "../http.ts";
 import { recordExample } from "../recorder.ts";
 import type { EndpointProbe, ProbeContext } from "./index.ts";
 
@@ -16,16 +16,17 @@ export const probeDeviceRejectDevice: EndpointProbe = {
   async run(ctx: ProbeContext): Promise<EndpointDoc> {
     const session = await openAuthenticatedSession(ctx);
     try {
-      const requested = await probePostForm("/device/request-device-id", { deviceName: `probe-reject-${Date.now()}` }, session.token);
-      const requestCmdId = (requested.body as { commandId?: string })?.commandId!;
+      const requested = await probePostForm("/device/request-unique-identifier", { deviceName: `probe-reject-${Date.now()}` }, session.token);
+      const requestCmdId = extractCommandId(requested.body)!;
       await session.ws.awaitCabAck(requestCmdId);
-      const retrieved = await probeGet(`/device/retrieve-device-id/${requestCmdId}`, session.token);
-      const deviceId = (retrieved.body as { deviceId?: string })?.deviceId!;
+      const retrieved = await probePostForm("/device/retrieve-unique-identifier", { id: requestCmdId }, session.token);
+      const retrievedBody = retrieved.body as { deviceIdentifier?: string } | string;
+      const deviceIdentifier = typeof retrievedBody === "string" ? retrievedBody : retrievedBody?.deviceIdentifier!;
 
-      const form = { deviceId };
+      const form = { deviceIdentifier };
       const response = await probePostForm("/device/reject-device", form, session.token);
       if (response.status !== 202) throw new Error(`reject-device expected 202, got ${response.status}`);
-      const commandId = (response.body as { commandId?: string })?.commandId;
+      const commandId = extractCommandId(response.body);
       if (!commandId) throw new Error(`reject-device: no commandId`);
       const ack = await session.ws.awaitCabAck(commandId);
 
@@ -36,7 +37,7 @@ export const probeDeviceRejectDevice: EndpointProbe = {
         path: "/device/reject-device",
         phase: "async-command",
         auth: "authorization-token",
-        parameters: [{ in: "form", name: "deviceId", required: true, type: "string", description: "The device id to reject." }],
+        parameters: [{ in: "form", name: "deviceIdentifier", required: true, type: "string", description: "The device identifier to reject." }],
         responses: [{ status: 202, description: "Rejection accepted." }],
         examples: [{
           ...recordExample({ name: "Happy path", method: "POST", path: "/device/reject-device", bodyType: "form", body: form, response }),

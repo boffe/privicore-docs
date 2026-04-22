@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import type { EndpointDoc } from "../../ir/types.ts";
 import { openAuthenticatedSession } from "../auth.ts";
-import { probePostForm } from "../http.ts";
+import { probePostForm, extractCommandId } from "../http.ts";
 import { recordExample } from "../recorder.ts";
 import { reserveTokenSpace } from "../fixtures.ts";
 import type { EndpointProbe, ProbeContext } from "./index.ts";
@@ -22,7 +22,7 @@ export const probeDataTokenConfigureFileMeta: EndpointProbe = {
       const tag = cipher.getAuthTag();
       const dataB64 = Buffer.concat([iv, ct, tag]).toString("base64");
       const exchange = await probePostForm("/data-token/exchange-data-for-token", { temporaryTokenSpace: reservation.temporaryToken, data: dataB64 }, session.token);
-      const exchangeCmdId = (exchange.body as { commandId?: string })?.commandId!;
+      const exchangeCmdId = extractCommandId(exchange.body)!;
       await session.ws.awaitCabAck(exchangeCmdId);
 
       const form = {

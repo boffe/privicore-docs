@@ -68,6 +68,55 @@ export async function probePostFormBasic(
   return toProbeResponse(res);
 }
 
+/**
+ * POST with a raw Basic-auth value (no base64, no "clientId:clientSecret"
+ * composition). Used by `/oauth-application/refresh-access-token` and
+ * `/oauth-application/retrieve-oauth-application-scope`, which expect
+ * the header to be `Basic <raw-access-token>` — the server looks the
+ * value up directly in its token repository.
+ */
+export async function probePostFormRawBasic(
+  path: string,
+  form: Record<string, string>,
+  rawValue: string,
+): Promise<ProbeResponse> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/x-www-form-urlencoded",
+    "Authorization": `Basic ${rawValue}`,
+  };
+  const body = new URLSearchParams(form).toString();
+  const res = await fetch(new URL(path, baseUrl() + "/"), { method: "POST", headers, body });
+  return toProbeResponse(res);
+}
+
+/**
+ * Extract a command id from a probe response body. Privicore returns
+ * async-command identifiers in a few different wire shapes depending on
+ * the endpoint:
+ *
+ *   - a bare string: `"5a1b2c3d-..."`
+ *   - a single-element array: `["5a1b2c3d-..."]`
+ *   - an object: `{ commandId: "5a1b2c3d-..." }`
+ *
+ * Returns `undefined` if none of those shapes is present, so callers
+ * can decide whether to throw with a useful error or move on.
+ */
+export function extractCommandId(body: unknown): string | undefined {
+  if (typeof body === "string") {
+    const trimmed = body.replace(/^"|"$/g, "").trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+  if (Array.isArray(body)) {
+    const first = body[0];
+    return typeof first === "string" && first.length > 0 ? first : undefined;
+  }
+  if (body && typeof body === "object") {
+    const obj = body as { commandId?: unknown };
+    if (typeof obj.commandId === "string" && obj.commandId.length > 0) return obj.commandId;
+  }
+  return undefined;
+}
+
 async function toProbeResponse(res: Response): Promise<ProbeResponse> {
   const rawBody = await res.text();
   let body: unknown = rawBody;

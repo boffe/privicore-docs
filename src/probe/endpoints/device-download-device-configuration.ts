@@ -16,8 +16,8 @@ export const probeDeviceDownloadDeviceConfiguration: EndpointProbe = {
   async run(ctx: ProbeContext): Promise<EndpointDoc> {
     const session = await openAuthenticatedSession(ctx);
     try {
-      const deviceId = await createAndApproveDevice(session);
-      const form = { deviceId };
+      const deviceIdentifier = await createAndApproveDevice(session);
+      const form = { deviceIdentifier };
       const response = await probePostForm("/device/download-device-configuration", form, session.token);
       if (response.status !== 200) throw new Error(`download-device-configuration expected 200, got ${response.status}`);
 
@@ -30,7 +30,7 @@ export const probeDeviceDownloadDeviceConfiguration: EndpointProbe = {
         path: "/device/download-device-configuration",
         phase: "sync",
         auth: "authorization-token",
-        parameters: [{ in: "form", name: "deviceId", required: true, type: "string", description: "The device to issue configuration for." }],
+        parameters: [{ in: "form", name: "deviceIdentifier", required: true, type: "string", description: "The device to issue configuration for." }],
         responses: [{ status: 200, description: "Configuration bundle.", schema: { type: "object" } }],
         examples: [recordExample({
           name: "Happy path",

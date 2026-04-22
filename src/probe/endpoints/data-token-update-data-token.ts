@@ -1,6 +1,6 @@
 import type { EndpointDoc } from "../../ir/types.ts";
 import { openAuthenticatedSession } from "../auth.ts";
-import { probePostForm } from "../http.ts";
+import { probePostForm, extractCommandId } from "../http.ts";
 import { recordExample } from "../recorder.ts";
 import { storeSmallPayload } from "../fixtures.ts";
 import type { EndpointProbe, ProbeContext } from "./index.ts";
@@ -15,7 +15,7 @@ export const probeDataTokenUpdateDataToken: EndpointProbe = {
       const form = { token: stored.permanentToken, fileName: "probe-renamed.txt", context: `probe-renamed/${Date.now()}` };
       const response = await probePostForm("/data-token/update-data-token", form, session.token);
       if (response.status !== 202) throw new Error(`update-data-token expected 202, got ${response.status}`);
-      const commandId = (response.body as { commandId?: string })?.commandId;
+      const commandId = extractCommandId(response.body);
       if (!commandId) throw new Error(`update-data-token: no commandId`);
       const ack = await session.ws.awaitCabAck(commandId);
 

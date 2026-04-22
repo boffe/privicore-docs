@@ -1,14 +1,13 @@
 import type { EndpointDoc } from "../../ir/types.ts";
 import { openAuthenticatedSession } from "../auth.ts";
-import { probeGet, probePostForm } from "../http.ts";
+import { probeGet, probePostForm, probePostJson, extractCommandId } from "../http.ts";
 import { recordExample } from "../recorder.ts";
 import { createVotingConfiguration } from "../fixtures.ts";
 import type { EndpointProbe, ProbeContext } from "./index.ts";
 
 /**
- * Self-cleaning: registers and activates a fresh policy, then
- * deactivates it. Existing activated policies on the profile are not
- * touched.
+ * Self-cleaning: registers + activates a fresh policy, then deactivates
+ * it. Existing activated policies on the profile are not touched.
  */
 export const probePolicyDeactivatePolicy: EndpointProbe = {
   id: "policy.deactivate-policy",
@@ -19,29 +18,42 @@ export const probePolicyDeactivatePolicy: EndpointProbe = {
     try {
       const votingConfigName = await createVotingConfiguration(session);
       const templates = await probeGet("/policy/list-policy-templates", session.token);
-      const eventId = extractAnyEventId(templates.body);
-      if (!eventId) throw new Error(`deactivate-policy setup: no event ids available`);
+      const picked = pickTemplateAndEvent(templates.body);
+      if (!picked) throw new Error(`deactivate-policy setup: no template/event pair available`);
 
       const policyName = `probe-policy-${Date.now()}`;
-      const registered = await probePostForm(
-        "/policy/register-policy",
+      const registered = await probePostJson(
+        "/policy/register",
         {
           name: policyName,
-          configuration: JSON.stringify({ scope: "profile" }),
+          policyTemplateId: picked.templateId,
+          applyingEventIds: [picked.eventId],
           votingConfigurationId: votingConfigName,
-          applyingEventIds: String(eventId),
+          configuration: { classification: "internal", label: "probe", handling: "none" },
         },
         session.token,
       );
-      await session.ws.awaitCabAck((registered.body as { commandId?: string })?.commandId!);
+      await session.ws.awaitCabAck(extractCommandId(registered.body)!);
 
-      const activated = await probePostForm("/policy/activate-policy", { name: policyName }, session.token);
-      await session.ws.awaitCabAck((activated.body as { commandId?: string })?.commandId!);
+      let policyId: string | undefined;
+      for (let attempt = 0; attempt < 5 && !policyId; attempt++) {
+        if (attempt > 0) await new Promise((r) => setTimeout(r, 1000));
+        const r = await probeGet(`/policy/retrieve-policy/${encodeURIComponent(policyName)}`, session.token);
+        if (r.status === 200 && (r.body as { id?: string })?.id) {
+          policyId = (r.body as { id: string }).id;
+        }
+      }
+      if (!policyId) throw new Error(`deactivate-policy: could not retrieve ${policyName} after register`);
 
-      const form = { name: policyName };
-      const response = await probePostForm("/policy/deactivate-policy", form, session.token);
-      if (response.status !== 202) throw new Error(`deactivate-policy expected 202, got ${response.status}`);
-      const commandId = (response.body as { commandId?: string })?.commandId;
+      const activated = await probePostForm("/policy/activate", { policyId }, session.token);
+      await session.ws.awaitCabAck(extractCommandId(activated.body)!);
+
+      const form = { policyId };
+      const response = await probePostForm("/policy/deactivate", form, session.token);
+      if (response.status !== 200 && response.status !== 202) {
+        throw new Error(`deactivate-policy expected 200 or 202, got ${response.status}`);
+      }
+      const commandId = extractCommandId(response.body);
       if (!commandId) throw new Error(`deactivate-policy: no commandId`);
       const ack = await session.ws.awaitCabAck(commandId);
 
@@ -49,13 +61,13 @@ export const probePolicyDeactivatePolicy: EndpointProbe = {
         id: "policy.deactivate-policy",
         summary: "Deactivate policy",
         method: "POST",
-        path: "/policy/deactivate-policy",
+        path: "/policy/deactivate",
         phase: "async-command",
         auth: "authorization-token",
-        parameters: [{ in: "form", name: "name", required: true, type: "string" }],
+        parameters: [{ in: "form", name: "policyId", required: true, type: "string" }],
         responses: [{ status: 202, description: "Policy deactivated." }],
         examples: [{
-          ...recordExample({ name: "Happy path", method: "POST", path: "/policy/deactivate-policy", bodyType: "form", body: form, response }),
+          ...recordExample({ name: "Happy path", method: "POST", path: "/policy/deactivate", bodyType: "form", body: form, response }),
           asyncAck: { type: ack.type, commandStatus: ack.commandStatus, body: ack.body },
         }],
         sourceRun: { tool: "probe", at: new Date().toISOString() },
@@ -66,13 +78,13 @@ export const probePolicyDeactivatePolicy: EndpointProbe = {
   },
 };
 
-function extractAnyEventId(body: unknown): number | string | undefined {
-  const arr = Array.isArray(body) ? body : (body as { items?: unknown[] })?.items;
-  if (!Array.isArray(arr)) return undefined;
-  for (const t of arr) {
+function pickTemplateAndEvent(templatesBody: unknown): { templateId: string; eventId: string } | undefined {
+  if (!templatesBody || typeof templatesBody !== "object") return undefined;
+  for (const [templateId, t] of Object.entries(templatesBody as Record<string, unknown>)) {
     const events = (t as { events?: Record<string, unknown> })?.events;
     if (events && typeof events === "object") {
-      for (const v of Object.values(events)) if (typeof v === "number" || typeof v === "string") return v;
+      const firstEventId = Object.keys(events)[0];
+      if (firstEventId) return { templateId, eventId: firstEventId };
     }
   }
   return undefined;

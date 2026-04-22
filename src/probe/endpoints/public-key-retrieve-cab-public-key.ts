@@ -9,19 +9,19 @@ export const probePublicKeyRetrieveCabPublicKey: EndpointProbe = {
   summary: "Retrieve CAB public key",
   async run(ctx: ProbeContext): Promise<EndpointDoc> {
     const token = await authenticate(ctx);
-    const response = await probeGet("/public-key/retrieve-cab-public-key", token);
+    const response = await probeGet("/dptcab/public-key", token);
     if (response.status !== 200) throw new Error(`retrieve-cab-public-key expected 200, got ${response.status}`);
     return {
       id: "public-key.retrieve-cab-public-key",
       summary: "Retrieve CAB public key",
       method: "GET",
-      path: "/public-key/retrieve-cab-public-key",
+      path: "/dptcab/public-key",
       phase: "sync",
       auth: "authorization-token",
       responses: [
         { status: 200, description: "The engine's registered public key.", schema: { type: "object", properties: { publicKey: { type: "string" } } } },
       ],
-      examples: [recordExample({ name: "Happy path", method: "GET", path: "/public-key/retrieve-cab-public-key", bodyType: "none", response })],
+      examples: [recordExample({ name: "Happy path", method: "GET", path: "/dptcab/public-key", bodyType: "none", response })],
       sourceRun: { tool: "probe", at: new Date().toISOString() },
     };
   },

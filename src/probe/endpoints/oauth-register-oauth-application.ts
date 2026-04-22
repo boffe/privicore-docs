@@ -1,6 +1,6 @@
 import type { EndpointDoc } from "../../ir/types.ts";
 import { openAuthenticatedSession } from "../auth.ts";
-import { probePostForm } from "../http.ts";
+import { probePostForm, extractCommandId } from "../http.ts";
 import { recordExample } from "../recorder.ts";
 import type { EndpointProbe, ProbeContext } from "./index.ts";
 
@@ -15,9 +15,9 @@ export const probeOauthRegisterOauthApplication: EndpointProbe = {
         redirectUri: "https://probe.example.com/oauth/callback",
         scopes: "data-token:read",
       };
-      const response = await probePostForm("/oauth/register-oauth-application", form, session.token);
+      const response = await probePostForm("/profile/oauth-application-register", form, session.token);
       if (response.status !== 202) throw new Error(`register-oauth-application expected 202, got ${response.status}`);
-      const commandId = (response.body as { commandId?: string })?.commandId;
+      const commandId = extractCommandId(response.body);
       if (!commandId) throw new Error(`register-oauth-application: no commandId in response body`);
       const ack = await session.ws.awaitCabAck(commandId);
 
@@ -25,7 +25,7 @@ export const probeOauthRegisterOauthApplication: EndpointProbe = {
         id: "oauth.register-oauth-application",
         summary: "Register OAuth application",
         method: "POST",
-        path: "/oauth/register-oauth-application",
+        path: "/profile/oauth-application-register",
         phase: "async-command",
         auth: "authorization-token",
         parameters: [
@@ -37,7 +37,7 @@ export const probeOauthRegisterOauthApplication: EndpointProbe = {
           { status: 202, description: "Registration accepted; await the `X-DPT-CAB-ID` ack.", schema: { type: "object", properties: { commandId: { type: "string" } } } },
         ],
         examples: [{
-          ...recordExample({ name: "Happy path", method: "POST", path: "/oauth/register-oauth-application", bodyType: "form", body: form, response }),
+          ...recordExample({ name: "Happy path", method: "POST", path: "/profile/oauth-application-register", bodyType: "form", body: form, response }),
           asyncAck: { type: ack.type, commandStatus: ack.commandStatus, body: ack.body },
         }],
         sourceRun: { tool: "probe", at: new Date().toISOString() },

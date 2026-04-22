@@ -10,37 +10,62 @@
  */
 
 import crypto from "node:crypto";
-import { probeGet, probePostForm } from "./http.ts";
+import { probeGet, probePostForm, probePostJson, extractCommandId } from "./http.ts";
 import { ProbeWS } from "./ws.ts";
 import type { AuthenticatedSession } from "./auth.ts";
 import { generateSignedKeyPair } from "./crypto.ts";
+
+async function pollCommandStatus(apiUrl: string, cmdId: string, timeoutMs = 30_000): Promise<string> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const res = await fetch(`${apiUrl.replace(/\/$/, "")}/request-status/${cmdId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    const raw = await res.text();
+    let data: unknown = raw;
+    try { data = JSON.parse(raw); } catch { /* keep as string */ }
+    const status = Array.isArray(data) ? data[0] : data;
+    if (typeof status === "string" && status !== "started") return status;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(`pollCommandStatus: timeout on ${cmdId}`);
+}
 
 /** Request a device id, await the ack, retrieve the assigned id,
  *  and approve it. Returns the approved deviceId. */
 export async function createAndApproveDevice(session: AuthenticatedSession): Promise<string> {
   const requested = await probePostForm(
-    "/device/request-device-id",
+    "/device/request-unique-identifier",
     { deviceName: `probe-device-${Date.now()}` },
     session.token,
   );
-  const requestCmdId = (requested.body as { commandId?: string })?.commandId;
-  if (!requestCmdId) throw new Error(`fixture: request-device-id returned no commandId`);
+  const requestCmdId = extractCommandId(requested.body);
+  if (!requestCmdId) throw new Error(`fixture: request-unique-identifier returned no commandId (body: ${JSON.stringify(requested.body).slice(0, 200)})`);
   await session.ws.awaitCabAck(requestCmdId);
 
-  const retrieved = await probeGet(`/device/retrieve-device-id/${requestCmdId}`, session.token);
-  const deviceId = (retrieved.body as { deviceId?: string })?.deviceId;
-  if (!deviceId) throw new Error(`fixture: retrieve-device-id returned no deviceId`);
+  const retrieved = await probePostForm(
+    "/device/retrieve-unique-identifier",
+    { id: requestCmdId },
+    session.token,
+  );
+  const retrievedBody = retrieved.body as { deviceIdentifier?: string } | string;
+  const deviceIdentifier = typeof retrievedBody === "string"
+    ? retrievedBody
+    : retrievedBody?.deviceIdentifier;
+  if (!deviceIdentifier) throw new Error(`fixture: retrieve-unique-identifier returned no deviceIdentifier`);
 
   const approved = await probePostForm(
     "/device/approve-device",
-    { deviceId },
+    { deviceIdentifier },
     session.token,
   );
-  const approveCmdId = (approved.body as { commandId?: string })?.commandId;
+  const approveCmdId = extractCommandId(approved.body);
   if (!approveCmdId) throw new Error(`fixture: approve-device returned no commandId`);
   await session.ws.awaitCabAck(approveCmdId);
 
-  return deviceId;
+  return deviceIdentifier;
 }
 
 export interface ReservedTokenSpace {
@@ -53,17 +78,19 @@ export interface ReservedTokenSpace {
 export async function reserveTokenSpace(session: AuthenticatedSession): Promise<ReservedTokenSpace> {
   const reserve = await probePostForm(
     "/data-token/reserve-token-space",
-    { context: `probe/${Date.now()}`, ttl: "300" },
+    { context: `probe/${Date.now()}`, ttl: "5" },
     session.token,
   );
-  const commandId = (reserve.body as { commandId?: string })?.commandId;
-  if (!commandId) throw new Error(`fixture: reserve-token-space returned no commandId`);
+  const commandId = extractCommandId(reserve.body);
+  if (!commandId) throw new Error(`fixture: reserve-token-space returned no commandId (body: ${JSON.stringify(reserve.body).slice(0, 200)})`);
   await session.ws.awaitCabAck(commandId);
 
   const retrieve = await probeGet(`/data-token/retrieve-temporary-data-token/${commandId}`, session.token);
-  const body = retrieve.body as { token?: string; stream?: string };
-  if (!body?.token) throw new Error(`fixture: retrieve-temporary-data-token returned no token`);
-  return { commandId, temporaryToken: body.token, streamUrl: body.stream ?? "" };
+  const rawBody = retrieve.body as { token?: string; stream?: string } | string;
+  const temporaryToken = typeof rawBody === "string" ? rawBody : rawBody?.token;
+  const streamUrl = typeof rawBody === "object" && rawBody ? (rawBody.stream ?? "") : "";
+  if (!temporaryToken) throw new Error(`fixture: retrieve-temporary-data-token returned no token`);
+  return { commandId, temporaryToken, streamUrl };
 }
 
 export interface StoredDataToken {
@@ -93,8 +120,8 @@ export async function storeSmallPayload(session: AuthenticatedSession, plaintext
     { temporaryTokenSpace: reservation.temporaryToken, data: dataB64 },
     session.token,
   );
-  const exchangeCmdId = (exchange.body as { commandId?: string })?.commandId;
-  if (!exchangeCmdId) throw new Error(`fixture: exchange-data-for-token returned no commandId`);
+  const exchangeCmdId = extractCommandId(exchange.body);
+  if (!exchangeCmdId) throw new Error(`fixture: exchange-data-for-token returned no commandId (body: ${JSON.stringify(exchange.body).slice(0, 200)})`);
   await session.ws.awaitCabAck(exchangeCmdId);
 
   const configure = await probePostForm(
@@ -133,40 +160,39 @@ export interface ThrowawayProfile {
  * revoke-token, register-public-key). The throwaway profile is
  * abandoned when the probe finishes.
  */
-export async function createThrowawayProfile(wsUrl: string): Promise<ThrowawayProfile> {
+export async function createThrowawayProfile(apiUrl: string, wsUrl: string): Promise<ThrowawayProfile> {
   const username = `probe-user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@probe.local`;
   const password = `Probe-${Date.now()}-pwd`;
 
-  // 1. Register profile.
+  // 1. Register profile. Async-command: body is a bare string/array
+  //    containing the commandId; poll /request-status until settled.
   const reg = await probePostForm("/profile/register-profile", { username, password });
-  if (reg.status !== 202) throw new Error(`throwaway profile: register-profile ${reg.status}`);
-
-  // 2. Register public key. register-public-key is itself async-command
-  //    but we don't have a session for the new profile yet. Poll the
-  //    returned commandId if present, or rely on the server having
-  //    processed the registration by the time our own session picks it
-  //    up.
-  const keyPair = generateSignedKeyPair();
-  const keyReg = await probePostForm("/public-key/register-public-key", {
-    username,
-    password,
-    publicKey: keyPair.signedPublicKeyHex,
-  });
-  if (keyReg.status !== 202) throw new Error(`throwaway profile: register-public-key ${keyReg.status}`);
-
-  // 3. Poll until authenticate succeeds — this is our proxy for "the
-  //    async registration + pubkey-registration have both landed."
-  let token: string | undefined;
-  const deadline = Date.now() + 20_000;
-  while (Date.now() < deadline) {
-    const auth = await probePostForm("/profile/authenticate", { username, password });
-    if (auth.status === 200) {
-      token = (auth.body as { authorizationToken?: string })?.authorizationToken;
-      if (token) break;
-    }
-    await new Promise((r) => setTimeout(r, 500));
+  if (reg.status !== 200 && reg.status !== 202) {
+    throw new Error(`throwaway profile: register-profile ${reg.status}`);
   }
-  if (!token) throw new Error(`throwaway profile: never became authenticatable`);
+  const regCmd = extractCommandId(reg.body);
+  if (regCmd) await pollCommandStatus(apiUrl, regCmd);
+
+  // 2. Authenticate as the new profile.
+  const auth = await probePostForm("/profile/authenticate", { username, password });
+  if (auth.status !== 200) throw new Error(`throwaway profile: authenticate ${auth.status}`);
+  const token = (auth.body as { authorizationToken?: string })?.authorizationToken;
+  if (!token) throw new Error(`throwaway profile: no authorizationToken in authenticate response`);
+
+  // 3. Register the profile's public key. Requires the auth token; the
+  //    payload is {publicKey} only — username/password are not accepted
+  //    on this endpoint.
+  const keyPair = generateSignedKeyPair();
+  const keyReg = await probePostForm(
+    "/public-key/register-public-key",
+    { publicKey: keyPair.signedPublicKeyHex },
+    token,
+  );
+  if (keyReg.status !== 200 && keyReg.status !== 202) {
+    throw new Error(`throwaway profile: register-public-key ${keyReg.status}`);
+  }
+  const keyCmd = extractCommandId(keyReg.body);
+  if (keyCmd) await pollCommandStatus(apiUrl, keyCmd);
 
   const ws = new ProbeWS();
   await ws.connect(wsUrl, token);
@@ -178,13 +204,13 @@ export async function createThrowawayProfile(wsUrl: string): Promise<ThrowawayPr
 /** Create a voting configuration and return its name. */
 export async function createVotingConfiguration(session: AuthenticatedSession): Promise<string> {
   const name = `probe-voting-config-${Date.now()}`;
-  const res = await probePostForm(
-    "/verified-authenticator/voting-configuration/create",
-    { name, strategy: "unanimous", timeLimit: "60" },
+  const res = await probePostJson(
+    "/verified-authenticator/voting-configuration/register",
+    { name, strategy: "unanimous", timeLimit: 60, deviceIdentifiers: [] },
     session.token,
   );
-  const commandId = (res.body as { commandId?: string })?.commandId;
-  if (!commandId) throw new Error(`fixture: voting-configuration/create returned no commandId`);
+  const commandId = extractCommandId(res.body);
+  if (!commandId) throw new Error(`fixture: voting-configuration/register returned no commandId (body: ${JSON.stringify(res.body).slice(0, 200)})`);
   await session.ws.awaitCabAck(commandId);
   return name;
 }

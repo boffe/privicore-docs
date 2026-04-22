@@ -1,6 +1,6 @@
 import type { EndpointDoc } from "../../ir/types.ts";
 import { openAuthenticatedSession } from "../auth.ts";
-import { probePostForm } from "../http.ts";
+import { probePostForm, extractCommandId } from "../http.ts";
 import { recordExample } from "../recorder.ts";
 import { storeSmallPayload } from "../fixtures.ts";
 import type { EndpointProbe, ProbeContext } from "./index.ts";
@@ -20,7 +20,7 @@ export const probeDataTokenDeleteData: EndpointProbe = {
       const form = { token: stored.permanentToken };
       const response = await probePostForm("/data-token/delete-data", form, session.token);
       if (response.status !== 202) throw new Error(`delete-data expected 202, got ${response.status}`);
-      const commandId = (response.body as { commandId?: string })?.commandId;
+      const commandId = extractCommandId(response.body);
       if (!commandId) throw new Error(`delete-data: no commandId`);
       const ack = await session.ws.awaitCabAck(commandId);
 
