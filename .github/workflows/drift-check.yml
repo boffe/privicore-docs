@@ -1,0 +1,67 @@
+# Drift check: run the probe suite against the live Privicore instance
+# and fail the PR if the wire behaviour has diverged from what's
+# committed in intermediate/docset.json.
+#
+# The check runs the full registered probe list in --verify mode, which
+# compares structural fields (method, path, phase, parameters,
+# responses) against the committed docset. Editorial prose, examples,
+# and timestamps are allowed to differ.
+#
+# Repo settings required:
+#
+#   Settings → Secrets and variables → Actions
+#     Secrets tab:
+#       PRIVICORE_USERNAME     The doc-writer probe profile's username.
+#       PRIVICORE_PASSWORD     That profile's password.
+#     Variables tab:
+#       PRIVICORE_API_URL      Full https://host:port for the CAB API.
+#       PRIVICORE_WS_URL       Full wss://host:port for the WebSocket proxy.
+#
+# Destructive probes are skipped by default. To run them manually (e.g.
+# to verify the destructive flow hasn't drifted), dispatch the workflow
+# via the Actions tab and flip `include-destructive` to true.
+
+name: Drift check
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      include-destructive:
+        description: "Also run destructive probes (creates extra throwaway state in the sandbox)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: drift-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Verify docset matches live server
+        env:
+          PRIVICORE_API_URL: ${{ vars.PRIVICORE_API_URL }}
+          PRIVICORE_WS_URL: ${{ vars.PRIVICORE_WS_URL }}
+          PRIVICORE_USERNAME: ${{ secrets.PRIVICORE_USERNAME }}
+          PRIVICORE_PASSWORD: ${{ secrets.PRIVICORE_PASSWORD }}
+        run: |
+          if [ "${{ inputs.include-destructive }}" = "true" ]; then
+            npm run probe -- --all --verify --allow-destructive
+          else
+            npm run probe -- --all --verify --skip-destructive
+          fi

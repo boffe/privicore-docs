@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.local
+dist/
+dist-*/
+*.log
+.DS_Store
+
+# Claude Code local permission cache — personal, not for the repo.
+.claude/settings.local.json
+
+# `intermediate/docset.json` is the committed source of truth — probe runs
+# merge into it editorially, it's not ephemeral. Keep it tracked.

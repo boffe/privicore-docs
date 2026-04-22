@@ -1,0 +1,24 @@
+{
+  "name": "privicore-doc-writer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Generates the Privicore API documentation site from a live reference instance and a curated editorial layer. Renders an Apidog-style three-column reference via Scalar plus MDX-style guide pages.",
+  "scripts": {
+    "probe": "tsx src/cli/probe.ts",
+    "build": "tsx src/cli/build.ts",
+    "preview": "tsx src/cli/preview.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@noble/hashes": "^2.2.0",
+    "@types/node": "^22.15.0",
+    "dotenv": "^16.4.7",
+    "highlight.js": "^11.11.1",
+    "marked": "^15.0.3",
+    "marked-highlight": "^2.2.4",
+    "tsx": "^4.19.2",
+    "tweetnacl": "^1.0.3",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,2288 @@
+{
+  "generatedAt": "2026-04-21T00:00:00Z",
+  "source": {
+    "privicoreApiUrl": "{{apiUrl}}",
+    "privicoreCommit": null
+  },
+  "endpoints": {
+    "profile.authenticate": {
+      "id": "profile.authenticate",
+      "summary": "Authenticate",
+      "description": "Exchanges a profile's credentials for an authorization token. The returned `authorizationToken` is an opaque string — treat it as a bearer secret and pass it on every subsequent API call as the `X-DPT-AUTHORIZATION` header. See the [Getting started](/guides/getting-started.html) guide for the end-to-end flow and the [Protocol overview](/guides/protocol-overview.html) for the encryption layers.",
+      "method": "POST",
+      "path": "/profile/authenticate",
+      "phase": "sync",
+      "auth": "public",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "username",
+          "required": true,
+          "type": "string",
+          "description": "The username the profile was registered with.",
+          "example": "alice@example.com"
+        },
+        {
+          "in": "form",
+          "name": "password",
+          "required": true,
+          "type": "string",
+          "description": "The profile's password.",
+          "example": "correct-horse-battery-staple"
+        }
+      ],
+      "responses": [
+        {
+          "status": 200,
+          "description": "Authentication succeeded; token returned.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "authorizationToken": {
+                "type": "string",
+                "description": "Bearer token. Pass as `X-DPT-AUTHORIZATION`.",
+                "example": "T-MUIFA…"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time",
+                "description": "ISO 8601 timestamp when this token expires."
+              }
+            },
+            "required": [
+              "authorizationToken",
+              "expiresAt"
+            ]
+          }
+        },
+        {
+          "status": 401,
+          "description": "Credentials rejected, or the profile's public key has not yet been registered."
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "POST",
+            "path": "/profile/authenticate",
+            "bodyType": "form",
+            "body": {
+              "username": "alice@example.com",
+              "password": "correct-horse-battery-staple"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "authorizationToken": "T-MUIFAabc123…",
+              "expiresAt": "2027-04-21T12:00:00Z"
+            }
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "profile.register-profile": {
+      "id": "profile.register-profile",
+      "summary": "Register new profile",
+      "description": "Creates a new profile with the supplied username and password. This endpoint is asynchronous: it returns a `commandId` immediately and the real outcome lands on the WebSocket proxy as an `X-DPT-CAB-ID` message. The profile is **not yet usable** until you also register a public key against it. See [Getting started](/guides/getting-started.html) for the full provisioning sequence.",
+      "method": "POST",
+      "path": "/profile/register-profile",
+      "phase": "async-command",
+      "auth": "public",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "username",
+          "required": true,
+          "type": "string",
+          "description": "Desired username. Must be unique across the instance.",
+          "example": "alice@example.com"
+        },
+        {
+          "in": "form",
+          "name": "password",
+          "required": true,
+          "type": "string",
+          "description": "Password for the new profile. Entropy requirements apply.",
+          "example": "correct-horse-battery-staple"
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Registration accepted; await the `X-DPT-CAB-ID` WebSocket message for final outcome.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "commandId": {
+                "type": "string",
+                "description": "Correlator for the async ack that will arrive on the WebSocket."
+              }
+            },
+            "required": [
+              "commandId"
+            ]
+          }
+        },
+        {
+          "status": 409,
+          "description": "Username already taken."
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "POST",
+            "path": "/profile/register-profile",
+            "bodyType": "form",
+            "body": {
+              "username": "alice@example.com",
+              "password": "correct-horse-battery-staple"
+            }
+          },
+          "response": {
+            "status": 202,
+            "body": {
+              "commandId": "7c0f1f3e-1a22-4e3d-8a1b-3a9b8c0d1e2f"
+            }
+          },
+          "asyncAck": {
+            "type": "X-DPT-CAB-ID",
+            "commandStatus": 2,
+            "body": null
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "public-key.register-public-key": {
+      "id": "public-key.register-public-key",
+      "summary": "Register public key",
+      "description": "Registers the public key that activates a profile. Until this call succeeds, the profile is inert: authentication will reject its credentials and no write operation will succeed. The `publicKey` field is a signed Curve25519 key encoded as 200 hex characters: `[4-byte version tag][32-byte pubkey][64-byte integrity hash]`. This endpoint is asynchronous; await the `X-DPT-CAB-ID` message for final outcome.",
+      "method": "POST",
+      "path": "/public-key/register-public-key",
+      "phase": "async-command",
+      "auth": "public",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "username",
+          "required": true,
+          "type": "string",
+          "description": "The profile to attach this key to.",
+          "example": "alice@example.com"
+        },
+        {
+          "in": "form",
+          "name": "password",
+          "required": true,
+          "type": "string",
+          "description": "The profile's password, used to authorise the attachment.",
+          "example": "correct-horse-battery-staple"
+        },
+        {
+          "in": "form",
+          "name": "publicKey",
+          "required": true,
+          "type": "string",
+          "description": "Signed Curve25519 public key, 200 hex characters: `[4-byte version tag][32-byte pubkey][64-byte integrity hash]`.",
+          "example": "31420500aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Key registration accepted; await the `X-DPT-CAB-ID` WebSocket message for final outcome.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "commandId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "commandId"
+            ]
+          }
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "POST",
+            "path": "/public-key/register-public-key",
+            "bodyType": "form",
+            "body": {
+              "username": "alice@example.com",
+              "password": "correct-horse-battery-staple",
+              "publicKey": "31420500…"
+            }
+          },
+          "response": {
+            "status": 202,
+            "body": {
+              "commandId": "8d1a2b3c-4d5e-6f70-8192-a3b4c5d6e7f8"
+            }
+          },
+          "asyncAck": {
+            "type": "X-DPT-CAB-ID",
+            "commandStatus": 2,
+            "body": null
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "data-token.reserve-token-space": {
+      "id": "data-token.reserve-token-space",
+      "summary": "Reserve token space",
+      "description": "Opens a reservation that a subsequent [`exchange-data-for-token`](#tag/data-token/operation/data-token.exchange-data-for-token) call can fill. The reservation carries your chosen `context` (free-form string — commonly used like a directory name) and a `ttl` in seconds after which an unused reservation expires. Asynchronous: poll the returned `commandId`, or await the matching `X-DPT-CAB-ID` message on the WebSocket. See the [Store and retrieve](/guides/store-and-retrieve.html) walkthrough for the end-to-end flow.",
+      "method": "POST",
+      "path": "/data-token/reserve-token-space",
+      "phase": "async-command",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "context",
+          "required": true,
+          "type": "string",
+          "description": "Free-form label attached to the reservation. Commonly used to group related tokens (e.g. a directory-style path).",
+          "example": "invoices/2026-Q1"
+        },
+        {
+          "in": "form",
+          "name": "ttl",
+          "required": true,
+          "type": "integer",
+          "description": "Time-to-live, in seconds, after which an unfilled reservation expires.",
+          "example": 3600
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Reservation accepted; await the `X-DPT-CAB-ID` WebSocket message for final outcome.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "commandId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "commandId"
+            ]
+          }
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "POST",
+            "path": "/data-token/reserve-token-space",
+            "bodyType": "form",
+            "body": {
+              "context": "invoices/2026-Q1",
+              "ttl": "3600"
+            }
+          },
+          "response": {
+            "status": 202,
+            "body": {
+              "commandId": "7c0f1f3e-1a22-4e3d-8a1b-3a9b8c0d1e2f"
+            }
+          },
+          "asyncAck": {
+            "type": "X-DPT-CAB-ID",
+            "commandStatus": 2,
+            "body": null
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "data-token.retrieve-temporary-data-token": {
+      "id": "data-token.retrieve-temporary-data-token",
+      "summary": "Retrieve temporary data token",
+      "description": "Once a reservation has settled (the `X-DPT-CAB-ID` ack has arrived with `command_status: 2`), call this endpoint with the reservation's `commandId` to receive the temporary token you exchange data against, plus a pre-authenticated URL for the upstream file-storage service used by the streaming upload path.",
+      "method": "GET",
+      "path": "/data-token/retrieve-temporary-data-token/{commandId}",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "path",
+          "name": "commandId",
+          "required": true,
+          "type": "string",
+          "description": "The command id returned by [`reserve-token-space`](#tag/data-token/operation/data-token.reserve-token-space).",
+          "example": "7c0f1f3e-1a22-4e3d-8a1b-3a9b8c0d1e2f"
+        }
+      ],
+      "responses": [
+        {
+          "status": 200,
+          "description": "The reservation was found and settled.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string",
+                "description": "Temporary token to pass as `temporaryTokenSpace` when exchanging data."
+              },
+              "stream": {
+                "type": "string",
+                "format": "uri",
+                "description": "Pre-authenticated URL on the upstream FSD for direct binary upload. Use for payloads larger than ~50 KB."
+              }
+            },
+            "required": [
+              "token",
+              "stream"
+            ]
+          }
+        },
+        {
+          "status": 404,
+          "description": "The reservation does not exist, has not yet settled, or has expired."
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "GET",
+            "path": "/data-token/retrieve-temporary-data-token/7c0f1f3e-1a22-4e3d-8a1b-3a9b8c0d1e2f",
+            "bodyType": "none"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "token": "tmp-3a71b4c9d2e5f678",
+              "stream": "{{upstreamUrl}}/?auth=…"
+            }
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "data-token.exchange-data-for-token": {
+      "id": "data-token.exchange-data-for-token",
+      "summary": "Exchange data for token",
+      "description": "Uploads an AES-256-GCM-encrypted payload against a temporary token reservation. The `data` field is base64 of the wire format `[12-byte IV][ciphertext][16-byte auth tag]` — see [Protocol overview → Encryption](/guides/protocol-overview.html#the-encryption-model). Use this endpoint for payloads up to ~50 KB; for larger payloads, POST the raw ciphertext to the `stream` URL returned by [`retrieve-temporary-data-token`](#tag/data-token/operation/data-token.retrieve-temporary-data-token) instead.",
+      "method": "POST",
+      "path": "/data-token/exchange-data-for-token",
+      "phase": "async-command",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "temporaryTokenSpace",
+          "required": true,
+          "type": "string",
+          "description": "The temporary token from [`retrieve-temporary-data-token`](#tag/data-token/operation/data-token.retrieve-temporary-data-token).",
+          "example": "tmp-3a71b4c9d2e5f678"
+        },
+        {
+          "in": "form",
+          "name": "data",
+          "required": true,
+          "type": "string",
+          "description": "Base64 of the AES-256-GCM wire format: `[12-byte IV][ciphertext][16-byte auth tag]`.",
+          "example": "u9bJ0VOiVf8U5uS4rHkn7yMM6AfqhhR4qA=="
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Payload accepted; await the `X-DPT-CAB-ID` WebSocket message for final outcome.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "commandId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "commandId"
+            ]
+          }
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "POST",
+            "path": "/data-token/exchange-data-for-token",
+            "bodyType": "form",
+            "body": {
+              "temporaryTokenSpace": "tmp-3a71b4c9d2e5f678",
+              "data": "u9bJ0VOiVf8U5uS4rHkn7yMM6AfqhhR4qA=="
+            }
+          },
+          "response": {
+            "status": 202,
+            "body": {
+              "commandId": "9f2e5a81-3c7d-4b9a-a8e6-112233445566"
+            }
+          },
+          "asyncAck": {
+            "type": "X-DPT-CAB-ID",
+            "commandStatus": 2,
+            "body": null
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "data-token.configure-file-meta": {
+      "id": "data-token.configure-file-meta",
+      "summary": "Configure file meta",
+      "description": "Commits file metadata against a filled temporary-token reservation and returns the **permanent data token** — the opaque string you persist in your own system as the long-lived handle for this payload. Every subsequent retrieve and lifecycle call uses this permanent token.",
+      "method": "POST",
+      "path": "/data-token/configure-file-meta",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "token",
+          "required": true,
+          "type": "string",
+          "description": "The temporary token from [`retrieve-temporary-data-token`](#tag/data-token/operation/data-token.retrieve-temporary-data-token).",
+          "example": "tmp-3a71b4c9d2e5f678"
+        },
+        {
+          "in": "form",
+          "name": "fileName",
+          "required": true,
+          "type": "string",
+          "description": "Original filename, for display and retrieval hints.",
+          "example": "hello.txt"
+        },
+        {
+          "in": "form",
+          "name": "extension",
+          "required": true,
+          "type": "string",
+          "description": "File extension without leading dot.",
+          "example": "txt"
+        },
+        {
+          "in": "form",
+          "name": "context",
+          "required": true,
+          "type": "string",
+          "description": "Matches the `context` used when the token was reserved.",
+          "example": "invoices/2026-Q1"
+        },
+        {
+          "in": "form",
+          "name": "size",
+          "required": true,
+          "type": "integer",
+          "description": "Plaintext payload size in bytes.",
+          "example": 39
+        },
+        {
+          "in": "form",
+          "name": "path",
+          "required": true,
+          "type": "string",
+          "description": "Virtual path within the context namespace.",
+          "example": "/"
+        }
+      ],
+      "responses": [
+        {
+          "status": 200,
+          "description": "Permanent data token issued.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string",
+                "description": "Permanent data token. Persist this — it is your long-lived handle."
+              }
+            },
+            "required": [
+              "token"
+            ]
+          }
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "POST",
+            "path": "/data-token/configure-file-meta",
+            "bodyType": "form",
+            "body": {
+              "token": "tmp-3a71b4c9d2e5f678",
+              "fileName": "hello.txt",
+              "extension": "txt",
+              "context": "invoices/2026-Q1",
+              "size": "39",
+              "path": "/"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "token": "dtk-9e22aabb-ccdd-eeff-0011-223344556677"
+            }
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "data-token.request-data": {
+      "id": "data-token.request-data",
+      "summary": "Request data",
+      "description": "Initiates a retrieval for a previously-stored token. The HTTP response headers include `x-dpt-cab-id` and `x-dpt-cab-request-id`; the actual payload (or a downstream stream authorisation) arrives as an `X-DPT-CAB-REQUEST-ID` message on the WebSocket. Branch on the message's `output_type`: `0` means the `body` is your AES ciphertext base64-encoded inline; `1` means the `body` is auth for a streamed download from the downstream file-storage service (await a `STREAM-READY` message, then `GET https://downstream…/?auth=<body>`). See [Store and retrieve](/guides/store-and-retrieve.html#step-5-retrieve-it-back) for the full branch.",
+      "method": "POST",
+      "path": "/data-token/request-data",
+      "phase": "async-request",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "token",
+          "required": true,
+          "type": "string",
+          "description": "The permanent data token from [`configure-file-meta`](#tag/data-token/operation/data-token.configure-file-meta).",
+          "example": "dtk-9e22aabb-ccdd-eeff-0011-223344556677"
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Request accepted. Read `x-dpt-cab-request-id` from the response headers and await the matching `X-DPT-CAB-REQUEST-ID` message on the WebSocket.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "commandId": {
+                "type": "string"
+              },
+              "requestId": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "status": 404,
+          "description": "The token does not exist or has been deleted."
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "POST",
+            "path": "/data-token/request-data",
+            "bodyType": "form",
+            "body": {
+              "token": "dtk-9e22aabb-ccdd-eeff-0011-223344556677"
+            }
+          },
+          "response": {
+            "status": 202,
+            "headers": {
+              "x-dpt-cab-id": "req-cmd-1a2b3c4d",
+              "x-dpt-cab-request-id": "req-1234abcd-ef56-7890-1234-567890abcdef"
+            },
+            "body": null
+          },
+          "asyncAck": {
+            "type": "X-DPT-CAB-REQUEST-ID",
+            "commandStatus": 2,
+            "body": {
+              "body": "u9bJ0VOiVf8U5uS4rHkn7yMM6AfqhhR4qA==",
+              "output_type": 0
+            }
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "public-key.retrieve-public-key": {
+      "id": "public-key.retrieve-public-key",
+      "summary": "Retrieve public key",
+      "description": "Returns the signed Curve25519 public key you registered with [`register-public-key`](#tag/public-key/operation/public-key.register-public-key), in the 200-hex-character signed format.",
+      "method": "GET",
+      "path": "/public-key/retrieve-public-key",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "responses": [
+        {
+          "status": 200,
+          "description": "Your registered public key.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "publicKey": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "publicKey"
+            ]
+          }
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "GET",
+            "path": "/public-key/retrieve-public-key",
+            "bodyType": "none"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "publicKey": "31420500aa…"
+            }
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "public-key.retrieve-cab-public-key": {
+      "id": "public-key.retrieve-cab-public-key",
+      "summary": "Retrieve CAB public key",
+      "description": "Returns the engine's own signed public key, used when you need to encrypt content *to* the engine or verify server-signed responses. Same 200-hex-character format as profile keys.",
+      "method": "GET",
+      "path": "/public-key/retrieve-cab-public-key",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "responses": [
+        {
+          "status": 200,
+          "description": "The engine's registered public key.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "publicKey": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "publicKey"
+            ]
+          }
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "GET",
+            "path": "/public-key/retrieve-cab-public-key",
+            "bodyType": "none"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "publicKey": "31420500ff…"
+            }
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "oauth.register-oauth-application": {
+      "id": "oauth.register-oauth-application",
+      "summary": "Register OAuth application",
+      "description": "Registers a third-party OAuth application under the caller's profile. Returns an `applicationId` that can be fed to [`retrieve-oauth-app-configuration`](#tag/oauth/operation/oauth.retrieve-oauth-app-configuration) for the application's client credentials. See the [OAuth applications](/guides/oauth-applications.html) guide for the end-to-end flow.",
+      "method": "POST",
+      "path": "/oauth/register-oauth-application",
+      "phase": "async-command",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "name",
+          "required": true,
+          "type": "string",
+          "description": "Display name for the application.",
+          "example": "my-integration"
+        },
+        {
+          "in": "form",
+          "name": "redirectUri",
+          "required": true,
+          "type": "string",
+          "description": "OAuth redirect URI to which authorization codes are sent.",
+          "example": "https://my-integration.example.com/oauth/callback"
+        },
+        {
+          "in": "form",
+          "name": "scopes",
+          "required": true,
+          "type": "string",
+          "description": "Comma-separated list of scopes the application may request.",
+          "example": "data-token:read,data-token:write"
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Registration accepted; await the WebSocket ack.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "commandId": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "POST",
+            "path": "/oauth/register-oauth-application",
+            "bodyType": "form",
+            "body": {
+              "name": "my-integration",
+              "redirectUri": "https://my-integration.example.com/oauth/callback",
+              "scopes": "data-token:read,data-token:write"
+            }
+          },
+          "response": {
+            "status": 202,
+            "body": {
+              "commandId": "oauth-cmd-…"
+            }
+          },
+          "asyncAck": {
+            "type": "X-DPT-CAB-ID",
+            "commandStatus": 2,
+            "body": null
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "oauth.retrieve-oauth-app-configuration": {
+      "id": "oauth.retrieve-oauth-app-configuration",
+      "summary": "Retrieve OAuth app configuration",
+      "description": "Returns the `clientId`, `clientSecret`, configured `redirectUri`, and granted `scopes` for a registered OAuth application. The `clientSecret` is sensitive — treat it like an API key.",
+      "method": "GET",
+      "path": "/oauth/retrieve-oauth-app-configuration/{applicationId}",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "path",
+          "name": "applicationId",
+          "required": true,
+          "type": "string",
+          "description": "Id returned by [`register-oauth-application`](#tag/oauth/operation/oauth.register-oauth-application).",
+          "example": "app-abc123"
+        }
+      ],
+      "responses": [
+        {
+          "status": 200,
+          "description": "Application configuration.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "applicationId": {
+                "type": "string"
+              },
+              "clientId": {
+                "type": "string"
+              },
+              "clientSecret": {
+                "type": "string"
+              },
+              "redirectUri": {
+                "type": "string"
+              },
+              "scopes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "GET",
+            "path": "/oauth/retrieve-oauth-app-configuration/app-abc123",
+            "bodyType": "none"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "applicationId": "app-abc123",
+              "clientId": "cli-zxc987",
+              "clientSecret": "shh-secret",
+              "redirectUri": "https://my-integration.example.com/oauth/callback",
+              "scopes": [
+                "data-token:read",
+                "data-token:write"
+              ]
+            }
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "oauth.request-oauth-app-authorization-code": {
+      "id": "oauth.request-oauth-app-authorization-code",
+      "summary": "Request OAuth app authorization code",
+      "description": "The user-consent leg of the OAuth authorization-code flow. In interactive integrations, this is typically surfaced via a browser redirect rather than a direct API call — but the wire call is documented here for completeness. On success the engine redirects the user to the application's configured `redirectUri` with a one-shot authorization code attached.",
+      "method": "POST",
+      "path": "/oauth/request-oauth-app-authorization-code",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "clientId",
+          "required": true,
+          "type": "string",
+          "description": "The application's public `clientId`."
+        },
+        {
+          "in": "form",
+          "name": "scopes",
+          "required": true,
+          "type": "string",
+          "description": "Comma-separated list of scopes the application is requesting."
+        },
+        {
+          "in": "form",
+          "name": "state",
+          "required": false,
+          "type": "string",
+          "description": "Opaque CSRF token echoed back on redirect for verification."
+        }
+      ],
+      "responses": [
+        {
+          "status": 302,
+          "description": "Redirect to `redirectUri` with `?code=…&state=…` query parameters."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "oauth.obtain-oauth-app-access-token": {
+      "id": "oauth.obtain-oauth-app-access-token",
+      "summary": "Obtain OAuth app access token",
+      "description": "Server-to-server exchange. Authenticate with HTTP Basic using `base64(clientId:clientSecret)` — **not** the authorization code, which goes in the form body. See the [OAuth applications](/guides/oauth-applications.html) guide for the end-to-end flow.",
+      "method": "POST",
+      "path": "/oauth/obtain-oauth-app-access-token",
+      "phase": "sync",
+      "auth": "oauth",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "grantType",
+          "required": true,
+          "type": "string",
+          "description": "Must be `authorization_code`.",
+          "example": "authorization_code"
+        },
+        {
+          "in": "form",
+          "name": "code",
+          "required": true,
+          "type": "string",
+          "description": "The one-shot authorization code from the consent leg."
+        }
+      ],
+      "responses": [
+        {
+          "status": 200,
+          "description": "Access token issued.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "accessToken": {
+                "type": "string"
+              },
+              "tokenType": {
+                "type": "string"
+              },
+              "expiresIn": {
+                "type": "integer"
+              },
+              "refreshToken": {
+                "type": "string"
+              },
+              "scope": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "status": 401,
+          "description": "Bad Basic-auth credentials, or code has expired / already been used."
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "POST",
+            "path": "/oauth/obtain-oauth-app-access-token",
+            "bodyType": "form",
+            "body": {
+              "grantType": "authorization_code",
+              "code": "auth-code-…"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "accessToken": "T-oauth-abc…",
+              "tokenType": "Bearer",
+              "expiresIn": 3600,
+              "refreshToken": "T-oauth-refresh-xyz…",
+              "scope": "data-token:read data-token:write"
+            }
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "oauth.refresh-oauth-app-access-token": {
+      "id": "oauth.refresh-oauth-app-access-token",
+      "summary": "Refresh OAuth app access token",
+      "description": "Trade a valid refresh token for a new access + refresh token pair. The previous refresh token is rotated; the previous access token (if still valid) is invalidated immediately.",
+      "method": "POST",
+      "path": "/oauth/refresh-oauth-app-access-token",
+      "phase": "sync",
+      "auth": "oauth",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "grantType",
+          "required": true,
+          "type": "string",
+          "description": "Must be `refresh_token`.",
+          "example": "refresh_token"
+        },
+        {
+          "in": "form",
+          "name": "refreshToken",
+          "required": true,
+          "type": "string",
+          "description": "The refresh token from the most recent token-issue response."
+        }
+      ],
+      "responses": [
+        {
+          "status": 200,
+          "description": "Fresh access + refresh token pair issued.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "accessToken": {
+                "type": "string"
+              },
+              "tokenType": {
+                "type": "string"
+              },
+              "expiresIn": {
+                "type": "integer"
+              },
+              "refreshToken": {
+                "type": "string"
+              },
+              "scope": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "status": 401,
+          "description": "Bad Basic-auth credentials, or refresh token already used / revoked."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "oauth.oauth-application-list": {
+      "id": "oauth.oauth-application-list",
+      "summary": "OAuth application list",
+      "description": "Returns every OAuth application registered under the authenticated profile, with scope and last-used metadata. Useful for account-management UIs that let users review and revoke integrations.",
+      "method": "GET",
+      "path": "/oauth/oauth-application-list",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "responses": [
+        {
+          "status": 200,
+          "description": "List of applications.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array"
+              },
+              "meta": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "GET",
+            "path": "/oauth/oauth-application-list",
+            "bodyType": "none"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "items": [
+                {
+                  "applicationId": "app-abc123",
+                  "name": "my-integration",
+                  "scopes": [
+                    "data-token:read",
+                    "data-token:write"
+                  ],
+                  "createdAt": "2026-04-01T09:00:00Z"
+                }
+              ],
+              "meta": {
+                "count": 1
+              }
+            }
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "utility.check-server-health": {
+      "id": "utility.check-server-health",
+      "summary": "Check server health",
+      "description": "Cheap liveness check. Returns 200 with a short status payload when the engine is up. Used as the hello-world call in [Getting started](/guides/getting-started.html).",
+      "method": "GET",
+      "path": "/utility/check-server-health",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "responses": [
+        {
+          "status": 200,
+          "description": "Engine is healthy.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "GET",
+            "path": "/utility/check-server-health",
+            "bodyType": "none"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "status": "ok"
+            }
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "utility.request-command-id-status": {
+      "id": "utility.request-command-id-status",
+      "summary": "Request command id status",
+      "description": "Inspect the current state of a command id without subscribing to the WebSocket. `command_status: 1` means still in flight, `2` means accepted/succeeded, `3` means rejected. Useful for one-shot scripts or for reconciling after a WebSocket reconnect.",
+      "method": "GET",
+      "path": "/utility/request-command-id-status/{commandId}",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "path",
+          "name": "commandId",
+          "required": true,
+          "type": "string",
+          "description": "The id returned by any async-command endpoint."
+        }
+      ],
+      "responses": [
+        {
+          "status": 200,
+          "description": "Current command state.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "commandId": {
+                "type": "string"
+              },
+              "command_status": {
+                "type": "integer"
+              },
+              "body": {}
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "GET",
+            "path": "/utility/request-command-id-status/7c0f1f3e-1a22",
+            "bodyType": "none"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "commandId": "7c0f1f3e-1a22",
+              "command_status": 2,
+              "body": null
+            }
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "device.request-device-id": {
+      "id": "device.request-device-id",
+      "summary": "Request device id",
+      "description": "First step in the device-onboarding chain. See [Device management](/guides/device-management.html).",
+      "method": "POST",
+      "path": "/device/request-device-id",
+      "phase": "async-command",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "deviceName",
+          "required": true,
+          "type": "string",
+          "description": "Friendly display name for the device.",
+          "example": "phone-a"
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Request accepted; await the WebSocket ack.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "commandId": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "POST",
+            "path": "/device/request-device-id",
+            "bodyType": "form",
+            "body": {
+              "deviceName": "phone-a"
+            }
+          },
+          "response": {
+            "status": 202,
+            "body": {
+              "commandId": "dev-cmd-…"
+            }
+          },
+          "asyncAck": {
+            "type": "X-DPT-CAB-ID",
+            "commandStatus": 2,
+            "body": null
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "device.retrieve-device-id": {
+      "id": "device.retrieve-device-id",
+      "summary": "Retrieve device id",
+      "description": "Once the `X-DPT-CAB-ID` ack for [`request-device-id`](#tag/device/operation/device.request-device-id) has landed with `command_status: 2`, fetch the assigned `deviceId` with this call.",
+      "method": "GET",
+      "path": "/device/retrieve-device-id/{commandId}",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "path",
+          "name": "commandId",
+          "required": true,
+          "type": "string",
+          "description": "Command id from `request-device-id`."
+        }
+      ],
+      "responses": [
+        {
+          "status": 200,
+          "description": "Device id assigned.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "deviceId": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "GET",
+            "path": "/device/retrieve-device-id/dev-cmd-abc",
+            "bodyType": "none"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "deviceId": "dev-abc123"
+            }
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "device.approve-device": {
+      "id": "device.approve-device",
+      "summary": "Approve device",
+      "description": "Owner consent step. After approval the device is active under the profile and can be specialised to a role (storage, authenticator).",
+      "method": "POST",
+      "path": "/device/approve-device",
+      "phase": "async-command",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "deviceId",
+          "required": true,
+          "type": "string",
+          "description": "The device id to approve."
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Approval accepted; await the WebSocket ack."
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "POST",
+            "path": "/device/approve-device",
+            "bodyType": "form",
+            "body": {
+              "deviceId": "dev-abc123"
+            }
+          },
+          "response": {
+            "status": 202,
+            "body": {
+              "commandId": "app-cmd-…"
+            }
+          },
+          "asyncAck": {
+            "type": "X-DPT-CAB-ID",
+            "commandStatus": 2,
+            "body": null
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "device.reject-device": {
+      "id": "device.reject-device",
+      "summary": "Reject device",
+      "description": "Discard a pending device registration instead of approving it. Use when a device-request arrives that you don't recognise.",
+      "method": "POST",
+      "path": "/device/reject-device",
+      "phase": "async-command",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "deviceId",
+          "required": true,
+          "type": "string",
+          "description": "The device id to reject."
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Rejection accepted."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "device.download-device-configuration": {
+      "id": "device.download-device-configuration",
+      "summary": "Download device configuration",
+      "description": "Returns the AMQP credentials, vhost, and routing-key binding the device needs to connect to the broker. Treat the response as a secret — it's equivalent to an API key.",
+      "method": "POST",
+      "path": "/device/download-device-configuration",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "deviceId",
+          "required": true,
+          "type": "string",
+          "description": "The device to issue configuration for."
+        }
+      ],
+      "responses": [
+        {
+          "status": 200,
+          "description": "Configuration bundle.",
+          "schema": {
+            "type": "object"
+          }
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "device.retrieve-profile-devices": {
+      "id": "device.retrieve-profile-devices",
+      "summary": "Retrieve profile devices",
+      "method": "GET",
+      "path": "/device/retrieve-profile-devices",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "responses": [
+        {
+          "status": 200,
+          "description": "Array of device records."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "device.configure-device-meta": {
+      "id": "device.configure-device-meta",
+      "summary": "Configure device meta",
+      "method": "POST",
+      "path": "/device/configure-device-meta",
+      "phase": "async-command",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "deviceId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "in": "form",
+          "name": "displayName",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "in": "form",
+          "name": "tags",
+          "required": false,
+          "type": "string",
+          "description": "Comma-separated list."
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Update accepted."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "device.remove-device": {
+      "id": "device.remove-device",
+      "summary": "Remove device",
+      "description": "Invalidates the device's credentials and deregisters any specialised role it held. See [Device management](/guides/device-management.html#removing-a-device).",
+      "method": "POST",
+      "path": "/device/remove-device",
+      "phase": "async-command",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "deviceId",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Removal accepted."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "storage.register-storage-device": {
+      "id": "storage.register-storage-device",
+      "summary": "Register storage device",
+      "description": "After approval ([`approve-device`](#tag/device/operation/device.approve-device)), call this to register the device in the storage fan-out. See [Storage device management](/guides/storage-device-management.html).",
+      "method": "POST",
+      "path": "/storage/register-storage-device",
+      "phase": "async-command",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "deviceId",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Promotion accepted."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "storage.list-storage-devices": {
+      "id": "storage.list-storage-devices",
+      "summary": "List storage devices",
+      "method": "GET",
+      "path": "/storage/list-storage-devices",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "responses": [
+        {
+          "status": 200,
+          "description": "Array of storage device records."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "storage.remove-storage": {
+      "id": "storage.remove-storage",
+      "summary": "Remove storage",
+      "description": "Stops fan-out to this device. Existing chunks on the device's disk are not reclaimed by the engine — handle decommissioning separately.",
+      "method": "POST",
+      "path": "/storage/remove-storage",
+      "phase": "async-command",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "deviceId",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Deregistration accepted."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "verified-authenticator.register-authenticator": {
+      "id": "verified-authenticator.register-authenticator",
+      "summary": "Register authenticator",
+      "description": "After approval, call this to make the device eligible to receive ballots. See [Voting-gated operations](/guides/voting-gated-operations.html).",
+      "method": "POST",
+      "path": "/verified-authenticator/register-authenticator",
+      "phase": "async-command",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "deviceId",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Promotion accepted."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "verified-authenticator.voting-configuration.create": {
+      "id": "verified-authenticator.voting-configuration.create",
+      "summary": "Create voting configuration",
+      "description": "Defines a strategy and ballot deadline that policies can reference. Omit `deviceIdentifiers` to dispatch ballots to every registered authenticator.",
+      "method": "POST",
+      "path": "/verified-authenticator/voting-configuration/create",
+      "phase": "async-command",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "name",
+          "required": true,
+          "type": "string",
+          "example": "high-assurance-exchange"
+        },
+        {
+          "in": "form",
+          "name": "strategy",
+          "required": true,
+          "type": "string",
+          "description": "Voting strategy — `unanimous` is canonical.",
+          "example": "unanimous"
+        },
+        {
+          "in": "form",
+          "name": "timeLimit",
+          "required": true,
+          "type": "integer",
+          "description": "Per-ballot deadline, in seconds.",
+          "example": 60
+        },
+        {
+          "in": "form",
+          "name": "deviceIdentifiers",
+          "required": false,
+          "type": "string",
+          "description": "Optional comma-separated list of device ids to target. Omit to dispatch to all authenticators."
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Configuration created."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "policy.register-policy": {
+      "id": "policy.register-policy",
+      "summary": "Register policy",
+      "description": "Links a voting configuration to one or more system events. `configuration` must be non-empty — provide at least one meaningful key. `applyingEventIds` comes from [`list-policy-templates`](#tag/policy/operation/policy.list-policy-templates).",
+      "method": "POST",
+      "path": "/policy/register-policy",
+      "phase": "async-command",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "name",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "in": "form",
+          "name": "configuration",
+          "required": true,
+          "type": "string",
+          "description": "JSON-serialised object of policy parameters. Cannot be empty."
+        },
+        {
+          "in": "form",
+          "name": "votingConfigurationId",
+          "required": true,
+          "type": "string",
+          "description": "Id of the voting configuration to use."
+        },
+        {
+          "in": "form",
+          "name": "applyingEventIds",
+          "required": true,
+          "type": "string",
+          "description": "Comma-separated event ids the policy gates."
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Policy registered."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "policy.activate-policy": {
+      "id": "policy.activate-policy",
+      "summary": "Activate policy",
+      "description": "Once active, the gated events are held for a voting pool until it resolves.",
+      "method": "POST",
+      "path": "/policy/activate-policy",
+      "phase": "async-command",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "name",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Policy activated."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "policy.deactivate-policy": {
+      "id": "policy.deactivate-policy",
+      "summary": "Deactivate policy",
+      "description": "Stops gating future events without deleting the policy configuration.",
+      "method": "POST",
+      "path": "/policy/deactivate-policy",
+      "phase": "async-command",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "name",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Policy deactivated."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "policy.list-policy-templates": {
+      "id": "policy.list-policy-templates",
+      "summary": "List policy templates",
+      "description": "Each template carries an `events` dict mapping event names (e.g. `data_token.data_exchanged`) to numeric ids — look up the id here to pass to `applyingEventIds` when registering a policy.",
+      "method": "GET",
+      "path": "/policy/list-policy-templates",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "responses": [
+        {
+          "status": 200,
+          "description": "Array of templates.",
+          "schema": {
+            "type": "array"
+          }
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "voting.check-pool-status": {
+      "id": "voting.check-pool-status",
+      "summary": "Check pool status",
+      "description": "Returns current ballot counts and pool state. Useful for dashboards, debugging, and observability tooling.",
+      "method": "GET",
+      "path": "/voting/check-pool-status/{poolId}",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "path",
+          "name": "poolId",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": [
+        {
+          "status": 200,
+          "description": "Pool status snapshot."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "data-token.list-data-tokens": {
+      "id": "data-token.list-data-tokens",
+      "summary": "List data tokens",
+      "description": "Paged list of tokens with their metadata. Use for management/audit tooling, not hot paths.",
+      "method": "GET",
+      "path": "/data-token/list-data-tokens",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "query",
+          "name": "page",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "in": "query",
+          "name": "perPage",
+          "required": false,
+          "type": "integer"
+        }
+      ],
+      "responses": [
+        {
+          "status": 200,
+          "description": "Paged list.",
+          "schema": {
+            "type": "object"
+          }
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "GET",
+            "path": "/data-token/list-data-tokens",
+            "bodyType": "none"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "items": [
+                {
+                  "token": "dtk-…",
+                  "context": "invoices/2026-Q1",
+                  "fileName": "hello.txt",
+                  "extension": "txt",
+                  "size": 39,
+                  "createdAt": "2026-04-21T12:00:00Z"
+                }
+              ],
+              "meta": {
+                "count": 1,
+                "page": 1,
+                "perPage": 25
+              }
+            }
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "data-token.update-data-token": {
+      "id": "data-token.update-data-token",
+      "summary": "Update data token",
+      "description": "Change a token's `fileName`, `extension`, or `context` without touching the payload. Asynchronous; await the `X-DPT-CAB-ID` ack.",
+      "method": "POST",
+      "path": "/data-token/update-data-token",
+      "phase": "async-command",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "token",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "in": "form",
+          "name": "fileName",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "in": "form",
+          "name": "extension",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "in": "form",
+          "name": "context",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Update accepted."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "data-token.configure-information-security-risk-meta": {
+      "id": "data-token.configure-information-security-risk-meta",
+      "summary": "Configure information security risk meta",
+      "description": "Sets a free-form metadata object for governance tooling. Schema is intentionally soft — the engine accepts arbitrary field names; pick one your organisation uses consistently.",
+      "method": "POST",
+      "path": "/data-token/configure-information-security-risk-meta",
+      "phase": "async-command",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "token",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Metadata accepted."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "data-token.delete-data": {
+      "id": "data-token.delete-data",
+      "summary": "Delete data",
+      "description": "Removes the engine-side token record and propagates removal to every registered storage device. No per-device delete acknowledgement is surfaced; for auditable deletion, reconcile each device independently.",
+      "method": "POST",
+      "path": "/data-token/delete-data",
+      "phase": "async-command",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "token",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Delete accepted; dispatched to storage devices."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "profile.change-password": {
+      "id": "profile.change-password",
+      "summary": "Change password",
+      "description": "Rotate the profile's password. Asynchronous — await the `X-DPT-CAB-ID` ack. Does not invalidate existing authorization tokens; call [`revoke-authorization-token`](#tag/profile/operation/profile.revoke-authorization-token) separately if you need all sessions to re-authenticate.",
+      "method": "POST",
+      "path": "/profile/change-password",
+      "phase": "async-command",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "currentPassword",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "in": "form",
+          "name": "newPassword",
+          "required": true,
+          "type": "string",
+          "description": "Entropy requirements apply."
+        }
+      ],
+      "responses": [
+        {
+          "status": 202,
+          "description": "Change accepted."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "profile.retrieve-profile-id": {
+      "id": "profile.retrieve-profile-id",
+      "summary": "Retrieve profile id",
+      "description": "Returns the profile's ULID. Safe to share with third-party systems as a stable reference; distinct from the username and password.",
+      "method": "GET",
+      "path": "/profile/retrieve-profile-id",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "responses": [
+        {
+          "status": 200,
+          "description": "Profile uuid.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "profileId": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "GET",
+            "path": "/profile/retrieve-profile-id",
+            "bodyType": "none"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "profileId": "prf-01HXW2K9ABCDEF"
+            }
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "profile.generate-qr-token-for-authorization": {
+      "id": "profile.generate-qr-token-for-authorization",
+      "summary": "Generate QR token for authorization",
+      "description": "Returns a short-lived token payload suitable for rendering as a QR code. Mobile authenticator apps scan it to pair with the profile without the three-step device-onboarding chain.",
+      "method": "POST",
+      "path": "/profile/generate-qr-token-for-authorization",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "responses": [
+        {
+          "status": 200,
+          "description": "QR token + TTL.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "qrToken": {
+                "type": "string"
+              },
+              "expiresAt": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "profile.retrieve-token-expiry": {
+      "id": "profile.retrieve-token-expiry",
+      "summary": "Retrieve token expiry",
+      "description": "Useful for clients that schedule reauthorisation before a token lapses.",
+      "method": "GET",
+      "path": "/profile/retrieve-token-expiry",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "responses": [
+        {
+          "status": 200,
+          "description": "Expiry timestamp.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "name": "Happy path",
+          "request": {
+            "method": "GET",
+            "path": "/profile/retrieve-token-expiry",
+            "bodyType": "none"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "expiresAt": "2027-04-21T12:00:00Z"
+            }
+          }
+        }
+      ],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "profile.reauthorize-authorization-token": {
+      "id": "profile.reauthorize-authorization-token",
+      "summary": "Reauthorize authorization token",
+      "description": "Issues a refreshed token with a new ttl without requiring the profile's password. The old token is superseded; use the new token for subsequent requests.",
+      "method": "POST",
+      "path": "/profile/reauthorize-authorization-token",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "parameters": [
+        {
+          "in": "form",
+          "name": "ttl",
+          "required": true,
+          "type": "integer",
+          "description": "New lifetime in seconds.",
+          "example": 2592000
+        }
+      ],
+      "responses": [
+        {
+          "status": 200,
+          "description": "Refreshed token issued.",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "authorizationToken": {
+                "type": "string"
+              },
+              "expiresAt": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    },
+    "profile.revoke-authorization-token": {
+      "id": "profile.revoke-authorization-token",
+      "summary": "Revoke authorization token",
+      "description": "Right call for logout and for suspected token leaks. After a successful revocation, the token returns 401 from that point on.",
+      "method": "POST",
+      "path": "/profile/revoke-authorization-token",
+      "phase": "sync",
+      "auth": "authorization-token",
+      "responses": [
+        {
+          "status": 200,
+          "description": "Token revoked."
+        }
+      ],
+      "examples": [],
+      "sourceRun": {
+        "tool": "manual",
+        "at": "2026-04-21T00:00:00Z",
+        "revision": "hand-authored-stub"
+      }
+    }
+  }
+}

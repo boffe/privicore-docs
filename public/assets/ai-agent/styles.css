@@ -1,0 +1,264 @@
+/* Floating AI assistant launcher + chat panel. Scoped aggressively so
+   it doesn't collide with Scalar's reference styles or the guide
+   chrome. */
+
+.dpai-launcher {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border-muted, #d0d7de);
+  background: var(--color-accent, #8250df);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-body, system-ui, sans-serif);
+  font-weight: 600;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.dpai-launcher:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+}
+.dpai-launcher:focus-visible {
+  outline: 2px solid var(--color-accent, #8250df);
+  outline-offset: 2px;
+}
+
+.dpai-panel {
+  position: fixed;
+  bottom: 86px;
+  right: 20px;
+  z-index: 9998;
+  width: 420px;
+  max-width: calc(100vw - 40px);
+  height: 600px;
+  max-height: calc(100vh - 120px);
+  background: var(--color-bg, #fff);
+  border: 1px solid var(--color-border, #d0d7de);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.14);
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: var(--font-body, system-ui, sans-serif);
+  color: var(--color-text, #1f2328);
+}
+.dpai-panel.dpai-open { display: flex; }
+
+.dpai-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-border-muted, #eaeef2);
+  background: var(--color-panel, #fafbfc);
+}
+.dpai-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.dpai-header-actions { display: flex; gap: 4px; }
+.dpai-header button {
+  background: transparent;
+  border: 0;
+  padding: 4px 8px;
+  cursor: pointer;
+  color: var(--color-muted, #656d76);
+  font-size: 0.8rem;
+  border-radius: 4px;
+}
+.dpai-header button:hover {
+  background: var(--color-panel-2, #f6f8fa);
+  color: var(--color-text, #1f2328);
+}
+
+.dpai-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.dpai-message {
+  max-width: 88%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.dpai-message.dpai-user {
+  align-self: flex-end;
+  background: var(--color-accent, #8250df);
+  color: #fff;
+  border-bottom-right-radius: 2px;
+}
+.dpai-message.dpai-assistant {
+  align-self: flex-start;
+  background: var(--color-panel-2, #f6f8fa);
+  color: var(--color-text, #1f2328);
+  border-bottom-left-radius: 2px;
+}
+.dpai-message.dpai-system {
+  align-self: center;
+  background: transparent;
+  color: var(--color-muted, #656d76);
+  font-size: 0.82rem;
+  font-style: italic;
+  max-width: 100%;
+  text-align: center;
+}
+.dpai-message.dpai-error {
+  align-self: center;
+  background: #ffebe9;
+  color: #82071e;
+  font-size: 0.85rem;
+  max-width: 100%;
+}
+.dpai-message code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.88em;
+}
+.dpai-message.dpai-user code { background: rgba(255, 255, 255, 0.18); }
+
+.dpai-message p { margin: 0 0 8px; }
+.dpai-message p:last-child { margin-bottom: 0; }
+.dpai-message ul, .dpai-message ol {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+.dpai-message li { margin-bottom: 2px; }
+.dpai-message pre {
+  background: #282c34;
+  color: #abb2bf;
+  border-radius: 6px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 6px 0 8px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.dpai-message pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font-size: inherit;
+  border-radius: 0;
+}
+.dpai-message a {
+  color: inherit;
+  text-decoration: underline;
+}
+.dpai-message.dpai-user a { color: #fff; }
+.dpai-message strong { font-weight: 600; }
+
+.dpai-input-row {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--color-border-muted, #eaeef2);
+  background: var(--color-bg, #fff);
+}
+.dpai-input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border, #d0d7de);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--color-text, #1f2328);
+  background: var(--color-bg, #fff);
+  resize: none;
+  min-height: 36px;
+  max-height: 140px;
+}
+.dpai-input:focus-visible {
+  outline: 2px solid var(--color-accent, #8250df);
+  outline-offset: -2px;
+  border-color: var(--color-accent, #8250df);
+}
+.dpai-send {
+  border: 0;
+  border-radius: 6px;
+  background: var(--color-accent, #8250df);
+  color: #fff;
+  padding: 0 14px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+.dpai-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Key-entry modal — inline inside the panel on first send. */
+.dpai-key-modal {
+  padding: 18px 16px;
+  border-bottom: 1px solid var(--color-border-muted, #eaeef2);
+  background: var(--color-panel, #fafbfc);
+  font-size: 0.88rem;
+}
+.dpai-key-modal.dpai-hidden { display: none; }
+.dpai-key-modal h4 {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.dpai-key-modal p {
+  margin: 0 0 10px;
+  color: var(--color-muted, #656d76);
+  line-height: 1.5;
+}
+.dpai-key-modal a {
+  color: var(--color-accent, #8250df);
+  text-decoration: none;
+}
+.dpai-key-modal a:hover { text-decoration: underline; }
+.dpai-key-modal input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border, #d0d7de);
+  border-radius: 6px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+}
+.dpai-key-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.dpai-key-modal button {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+.dpai-key-modal .dpai-key-save {
+  background: var(--color-accent, #8250df);
+  color: #fff;
+  border: 0;
+}
+.dpai-key-modal .dpai-key-cancel {
+  background: transparent;
+  border: 1px solid var(--color-border, #d0d7de);
+  color: var(--color-text, #1f2328);
+}

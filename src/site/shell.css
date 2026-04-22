@@ -1,0 +1,528 @@
+/* Site-wide styles. Tuned to resemble Apidog's rendered docs layout:
+   light-first with a purple accent, GitHub-Light code highlighting, and
+   colored-left-border admonition boxes. Dark mode still supported via
+   prefers-color-scheme. */
+
+/* Inter — Apidog references it in their font stack but never actually
+   loads it, so the render only matches on designers' machines that
+   happen to have Inter installed. We self-load it so every visitor
+   sees what their designers see. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+:root {
+  /* Topbar lives above every page. The `--scalar-custom-header-height`
+     mirror tells Scalar's sticky sidebar to offset by this much so our
+     topbar stays visible above it at all scroll positions. */
+  --topbar-height: 52px;
+  --scalar-custom-header-height: var(--topbar-height);
+
+  /* Light (default) — Apidog's docs.privicore.com aesthetic. */
+  --color-bg: #ffffff;
+  --color-panel: #fafbfc;
+  --color-panel-2: #f6f8fa;
+  --color-text: #1f2328;
+  --color-text-sub: #424a53;
+  --color-muted: #656d76;
+  --color-border: #d0d7de;
+  --color-border-muted: #eaeef2;
+  --color-accent: #8250df;         /* Apidog purple */
+  --color-accent-hover: #6639b7;
+  --color-accent-soft: #fbf7ff;    /* purple tint for link hovers, active nav */
+
+  /* Admonition palette (GitHub-style colored borders + tinted bg). */
+  --adm-info-bg: #ddf4ff;
+  --adm-info-border: #0969da;
+  --adm-note-bg: #f6f8fa;
+  --adm-note-border: #8250df;
+  --adm-tip-bg: #dafbe1;
+  --adm-tip-border: #1a7f37;
+  --adm-warning-bg: #fff8c5;
+  --adm-warning-border: #9a6700;
+  --adm-danger-bg: #ffebe9;
+  --adm-danger-border: #cf222e;
+
+  /* Typography — Apidog's exact stacks. Inter is their primary face (we
+     self-load it above so it actually renders everywhere). The mono
+     stack matches theirs byte-for-byte. */
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Scalar CSS variables — light mode. Mapped from our guide palette
+   so the reference page inherits the same colors as the rest of the
+   site. Variables prefixed with `--scalar-` are consumed by Scalar's
+   internal stylesheet. */
+html.light-mode,
+html.light-mode .sidebar {
+  --scalar-background-1: #ffffff;
+  --scalar-background-2: #fafbfc;
+  --scalar-background-3: #f6f8fa;
+  --scalar-background-accent: #8250df14;
+  --scalar-color-1: #1f2328;
+  --scalar-color-2: #424a53;
+  --scalar-color-3: #656d76;
+  --scalar-color-accent: #8250df;
+  --scalar-border-color: #d0d7de;
+
+  --scalar-sidebar-background-1: #fafbfc;
+  --scalar-sidebar-color-1: #1f2328;
+  --scalar-sidebar-color-2: #424a53;
+  /* Selected endpoint: pale purple bg, accent purple text — matches
+     the guide sidebar's active state. */
+  --scalar-sidebar-color-active: #6639b7;
+  --scalar-sidebar-item-active-background: #fbf7ff;
+  --scalar-sidebar-item-hover-color: #1f2328;
+  --scalar-sidebar-item-hover-background: #f6f8fa;
+  --scalar-sidebar-border-color: #eaeef2;
+  --scalar-sidebar-search-background: #f6f8fa;
+  --scalar-sidebar-search-border-color: #d0d7de;
+  --scalar-sidebar-search-color: #656d76;
+}
+
+/* Dark mode driven by an explicit class on <html> (set by theme.js
+   / the inline bootstrap in each page's <head>). Scalar responds to
+   the same class via its own `.dark-mode` CSS selectors, so a single
+   toggle drives both the guide chrome and the reference. */
+html.dark-mode {
+  /* Atlassian-style dark surface tokens — matches Scalar's rendered
+     feel and the familiar look of Confluence/Jira/GitHub dark mode. */
+  --color-bg: #1d2125;        /* body / page */
+  --color-panel: #22272b;     /* raised cards, sidebar */
+  --color-panel-2: #282e33;   /* code blocks */
+  --color-text: #e6edf3;
+  --color-text-sub: #c9d1d9;
+  --color-muted: #8b949e;
+  --color-border: #3b4148;
+  --color-border-muted: #2c3135;
+  --color-accent: #d2a8ff;
+  --color-accent-hover: #b87ff5;
+  --color-accent-soft: #2a1f3d;
+
+  --adm-info-bg: #16253c;
+  --adm-info-border: #1f6feb;
+  --adm-note-bg: #26213a;
+  --adm-note-border: #d2a8ff;
+  --adm-tip-bg: #152b20;
+  --adm-tip-border: #238636;
+  --adm-warning-bg: #332a0e;
+  --adm-warning-border: #bb8009;
+  --adm-danger-bg: #36181b;
+  --adm-danger-border: #f85149;
+}
+
+/* Scalar CSS variables — dark mode. Atlassian-style surface palette,
+   identical to the guide side. */
+html.dark-mode,
+html.dark-mode .sidebar {
+  --scalar-background-1: #1d2125;
+  --scalar-background-2: #22272b;
+  --scalar-background-3: #282e33;
+  --scalar-background-accent: #d2a8ff1f;
+  --scalar-color-1: #e6edf3;
+  --scalar-color-2: #c9d1d9;
+  --scalar-color-3: #8b949e;
+  --scalar-color-accent: #d2a8ff;
+  --scalar-border-color: #3b4148;
+
+  --scalar-sidebar-background-1: #1d2125;
+  --scalar-sidebar-color-1: #e6edf3;
+  --scalar-sidebar-color-2: #c9d1d9;
+  /* Active selected endpoint in the reference sidebar: soft purple
+     background, lighter purple foreground — matches the guide
+     sidebar's active state. */
+  --scalar-sidebar-color-active: #d2a8ff;
+  --scalar-sidebar-item-active-background: #2a1f3d;
+  --scalar-sidebar-item-hover-color: #e6edf3;
+  --scalar-sidebar-item-hover-background: #22272b;
+  --scalar-sidebar-border-color: #2c3135;
+  --scalar-sidebar-search-background: #22272b;
+  --scalar-sidebar-search-border-color: #3b4148;
+  --scalar-sidebar-search-color: #8b949e;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  /* Reserve space for the fixed topbar so content starts below it. */
+  padding-top: var(--topbar-height);
+  font-family: var(--font-body);
+  font-size: 16px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a { color: var(--color-accent); text-decoration: none; }
+a:hover { color: var(--color-accent-hover); text-decoration: underline; }
+
+/* -------- Top bar -------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--topbar-height);
+  padding: 0 24px;
+  border-bottom: 1px solid var(--color-border-muted);
+  background: var(--color-bg);
+  /* Fixed (not sticky) so Scalar's internal scroll containers can't
+     slide content over us. Main content compensates via top padding. */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+}
+
+.topbar-brand a {
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: 0.98rem;
+}
+.topbar-nav { display: flex; gap: 12px; align-items: center; }
+
+/* Theme toggle — a compact icon button on the right of the topbar.
+   Shows a moon in light mode, sun in dark mode. */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.theme-toggle:hover {
+  background: var(--color-panel-2);
+  color: var(--color-text);
+  border-color: var(--color-border-muted);
+}
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.theme-toggle svg { width: 16px; height: 16px; }
+/* Show the right icon for the active mode; theme.js swaps the class. */
+.theme-toggle .icon-sun { display: none; }
+html.dark-mode .theme-toggle .icon-moon { display: none; }
+html.dark-mode .theme-toggle .icon-sun { display: block; }
+.topbar-link {
+  color: var(--color-muted);
+  font-size: 0.88rem;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.topbar-link:hover {
+  color: var(--color-text);
+  background: var(--color-panel-2);
+  text-decoration: none;
+}
+
+/* -------- Landing -------- */
+
+.home-hero {
+  max-width: 960px;
+  margin: 64px auto 48px;
+  padding: 0 28px;
+  text-align: center;
+}
+.home-hero h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 12px;
+  color: var(--color-text);
+}
+.home-tagline {
+  color: var(--color-muted);
+  font-size: 1.1rem;
+  margin-bottom: 32px;
+}
+.home-hero-image {
+  display: block;
+  max-width: 560px;
+  width: 100%;
+  height: auto;
+  margin: 0 auto 40px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid var(--color-border-muted);
+  border-radius: 10px;
+}
+.home-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  text-align: left;
+}
+.home-card {
+  display: block;
+  padding: 20px 22px;
+  border: 1px solid var(--color-border-muted);
+  border-radius: 10px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.home-card:hover {
+  border-color: var(--color-accent);
+  box-shadow: 0 4px 12px rgba(130, 80, 223, 0.08);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+.home-card h3 { margin: 0 0 6px; font-size: 1.05rem; font-weight: 600; }
+.home-card p { margin: 0; color: var(--color-muted); font-size: 0.93rem; line-height: 1.5; }
+
+/* -------- Guide layout -------- */
+
+.guide-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px;
+  gap: 48px;
+}
+
+.guide-sidebar {
+  position: sticky;
+  top: 68px;
+  align-self: start;
+  padding: 8px 0;
+  max-height: calc(100vh - 90px);
+  overflow-y: auto;
+}
+.guide-sidebar h2 {
+  margin: 0 8px 10px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
+  font-weight: 600;
+}
+.guide-sidebar ul { list-style: none; margin: 0; padding: 0; }
+.guide-sidebar li a {
+  display: block;
+  padding: 6px 10px;
+  margin: 1px 0;
+  border-radius: 6px;
+  color: var(--color-text-sub);
+  font-size: 0.9rem;
+  font-weight: 450;
+}
+.guide-sidebar li a:hover {
+  background: var(--color-panel-2);
+  color: var(--color-text);
+  text-decoration: none;
+}
+.guide-sidebar li.active > a {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-hover);
+  font-weight: 600;
+}
+
+.guide-content { max-width: 760px; min-width: 0; }
+.guide-content h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border-muted);
+}
+.guide-content h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 40px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-border-muted);
+}
+.guide-content h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 28px 0 10px;
+}
+.guide-content h1, .guide-content h2, .guide-content h3 { scroll-margin-top: 80px; }
+.guide-content p { margin: 0 0 16px; }
+.guide-content ul, .guide-content ol { margin: 0 0 16px; padding-left: 24px; }
+.guide-content li { margin-bottom: 6px; }
+.guide-content strong { font-weight: 600; color: var(--color-text); }
+.guide-content hr {
+  border: 0;
+  border-top: 1px solid var(--color-border-muted);
+  margin: 32px 0;
+}
+.guide-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 24px auto;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid var(--color-border-muted);
+  border-radius: 8px;
+}
+.guide-content table {
+  border-collapse: collapse;
+  margin: 0 0 16px;
+  display: block;
+  overflow-x: auto;
+  font-size: 0.93rem;
+}
+.guide-content th, .guide-content td {
+  border: 1px solid var(--color-border-muted);
+  padding: 6px 13px;
+}
+.guide-content th {
+  background: var(--color-panel-2);
+  font-weight: 600;
+}
+
+/* -------- Code -------- */
+
+/* Inline code — Apidog-style subtle tinted pill. */
+.guide-content code {
+  font-family: var(--font-mono);
+  background: rgba(130, 80, 223, 0.08);
+  color: #6639b7;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.88em;
+  font-weight: 450;
+}
+html.dark-mode .guide-content code {
+  background: rgba(210, 168, 255, 0.15);
+  color: #d2a8ff;
+}
+
+/* Code blocks — GitHub-Light palette, matches Apidog's light theme. */
+.guide-content pre {
+  background: var(--color-panel-2);
+  border: 1px solid var(--color-border-muted);
+  padding: 14px 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: #1f2328;
+  margin: 0 0 16px;
+}
+.guide-content pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  border-radius: 0;
+}
+
+/* GitHub-Light highlight.js palette — default (light mode). */
+.hljs { color: #1f2328; background: transparent; }
+.hljs-comment, .hljs-quote { color: #6e7781; font-style: italic; }
+.hljs-doctag, .hljs-keyword, .hljs-meta .hljs-keyword,
+.hljs-template-tag, .hljs-template-variable, .hljs-type,
+.hljs-variable.language_ { color: #cf222e; }
+.hljs-title, .hljs-title.class_, .hljs-title.class_.inherited__,
+.hljs-title.function_ { color: #8250df; }
+.hljs-attr, .hljs-attribute, .hljs-literal,
+.hljs-meta, .hljs-number, .hljs-operator,
+.hljs-variable, .hljs-selector-attr, .hljs-selector-class,
+.hljs-selector-id { color: #0550ae; }
+.hljs-regexp, .hljs-string, .hljs-meta .hljs-string { color: #0a3069; }
+.hljs-built_in, .hljs-symbol { color: #953800; }
+.hljs-section, .hljs-name, .hljs-selector-tag, .hljs-subst,
+.hljs-tag, .hljs-bullet { color: #116329; }
+.hljs-strong { font-weight: 600; }
+.hljs-emphasis { font-style: italic; }
+.hljs-deletion { color: #82071e; background-color: #ffebe9; }
+.hljs-addition { color: #116329; background-color: #dafbe1; }
+
+/* GitHub-Dark highlight.js palette — kicks in under dark mode so
+   strings / numbers / keywords stay readable on the dark code-block
+   background. */
+html.dark-mode .hljs { color: #e6edf3; }
+html.dark-mode .hljs-comment,
+html.dark-mode .hljs-quote { color: #8b949e; }
+html.dark-mode .hljs-doctag,
+html.dark-mode .hljs-keyword,
+html.dark-mode .hljs-meta .hljs-keyword,
+html.dark-mode .hljs-template-tag,
+html.dark-mode .hljs-template-variable,
+html.dark-mode .hljs-type,
+html.dark-mode .hljs-variable.language_ { color: #ff7b72; }
+html.dark-mode .hljs-title,
+html.dark-mode .hljs-title.class_,
+html.dark-mode .hljs-title.class_.inherited__,
+html.dark-mode .hljs-title.function_ { color: #d2a8ff; }
+html.dark-mode .hljs-attr,
+html.dark-mode .hljs-attribute,
+html.dark-mode .hljs-literal,
+html.dark-mode .hljs-meta,
+html.dark-mode .hljs-number,
+html.dark-mode .hljs-operator,
+html.dark-mode .hljs-variable,
+html.dark-mode .hljs-selector-attr,
+html.dark-mode .hljs-selector-class,
+html.dark-mode .hljs-selector-id { color: #79c0ff; }
+html.dark-mode .hljs-regexp,
+html.dark-mode .hljs-string,
+html.dark-mode .hljs-meta .hljs-string { color: #a5d6ff; }
+html.dark-mode .hljs-built_in,
+html.dark-mode .hljs-symbol { color: #ffa657; }
+html.dark-mode .hljs-section,
+html.dark-mode .hljs-name,
+html.dark-mode .hljs-selector-tag,
+html.dark-mode .hljs-subst,
+html.dark-mode .hljs-tag,
+html.dark-mode .hljs-bullet { color: #7ee787; }
+html.dark-mode .hljs-deletion { color: #ffdcd7; background-color: #67060c; }
+html.dark-mode .hljs-addition { color: #aff5b4; background-color: #033a16; }
+
+/* -------- Admonitions -------- */
+
+.admonition {
+  border-left: 4px solid var(--color-border);
+  background: var(--color-panel-2);
+  padding: 12px 16px;
+  margin: 0 0 16px;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.95rem;
+}
+.admonition > :first-child { margin-top: 0; }
+.admonition > :last-child { margin-bottom: 0; }
+.admonition-title {
+  font-weight: 600;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.admonition-info { border-left-color: var(--adm-info-border); background: var(--adm-info-bg); }
+.admonition-info .admonition-title { color: var(--adm-info-border); }
+.admonition-note { border-left-color: var(--adm-note-border); background: var(--adm-note-bg); }
+.admonition-note .admonition-title { color: var(--adm-note-border); }
+.admonition-tip { border-left-color: var(--adm-tip-border); background: var(--adm-tip-bg); }
+.admonition-tip .admonition-title { color: var(--adm-tip-border); }
+.admonition-warning { border-left-color: var(--adm-warning-border); background: var(--adm-warning-bg); }
+.admonition-warning .admonition-title { color: var(--adm-warning-border); }
+.admonition-danger { border-left-color: var(--adm-danger-border); background: var(--adm-danger-bg); }
+.admonition-danger .admonition-title { color: var(--adm-danger-border); }
+
+/* -------- Reference mount (Scalar wrapper) -------- */
+
+.reference-mount { min-height: calc(100vh - var(--topbar-height)); }

@@ -1,0 +1,70 @@
+# Builds the docs site and publishes dist/ to GitHub Pages.
+#
+# Runs on every push to main, plus manually via the Actions tab.
+#
+# Requires, in the repository settings:
+#   1. Pages source set to "GitHub Actions" (Settings → Pages).
+#   2. DOCS_API_URL / DOCS_WS_URL / DOCS_UPSTREAM_URL / DOCS_DOWNSTREAM_URL
+#      set as Actions variables (Settings → Secrets and variables → Actions
+#      → Variables tab) if the site should point somewhere other than the
+#      default `cab.example.com` placeholders.
+#
+# Notes:
+#   - This workflow does not run the probe. The committed
+#     `intermediate/docset.json` is the source of truth at deploy time.
+#     A separate workflow (drift-check.yml) can run the probe against a
+#     reachable instance and fail the PR if the IR has drifted.
+#   - If the site needs to live under a sub-path (e.g. GitHub project
+#     Pages at user.github.io/repo), set a base path — see the inline
+#     note in the build step.
+
+name: Deploy docs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build site
+        env:
+          DOCS_API_URL: ${{ vars.DOCS_API_URL }}
+          DOCS_WS_URL: ${{ vars.DOCS_WS_URL }}
+          DOCS_UPSTREAM_URL: ${{ vars.DOCS_UPSTREAM_URL }}
+          DOCS_DOWNSTREAM_URL: ${{ vars.DOCS_DOWNSTREAM_URL }}
+        run: npm run build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
