@@ -28,6 +28,11 @@ export interface Config {
   docsWsUrl: string;
   docsUpstreamUrl: string;
   docsDownstreamUrl: string;
+  /** Canonical URL of the deployed docs site. Used by content that
+   *  gets copied out of the site (notably `agents.md`) so absolute
+   *  links keep resolving after integrators drop it into their own
+   *  project. */
+  docsSiteUrl: string;
 
   /** Base path the site is served under, e.g. "/privicore-docs" when
    *  hosted at boffe.github.io/privicore-docs/. Empty string when the
@@ -54,6 +59,7 @@ export function getConfig(): Config {
     docsWsUrl: optional("DOCS_WS_URL") ?? "wss://cab.example.com:8083",
     docsUpstreamUrl: optional("DOCS_UPSTREAM_URL") ?? "https://upstream.example.com:8010",
     docsDownstreamUrl: optional("DOCS_DOWNSTREAM_URL") ?? "https://downstream.example.com:8011",
+    docsSiteUrl: (optional("DOCS_SITE_URL") ?? "https://docs.example.com").replace(/\/+$/, ""),
     docsBasePath: normalizeBasePath(optional("DOCS_BASE_PATH") ?? ""),
   };
 }

@@ -47,6 +47,7 @@ export async function build(input: BuildInput): Promise<void> {
     wsUrl: cfg.docsWsUrl,
     upstreamUrl: cfg.docsUpstreamUrl,
     downstreamUrl: cfg.docsDownstreamUrl,
+    docsSiteUrl: cfg.docsSiteUrl,
   };
   const basePath = cfg.docsBasePath;
   // Prefixes our own absolute paths with the basePath (if any).
@@ -141,6 +142,11 @@ export async function build(input: BuildInput): Promise<void> {
         description: "Per-endpoint documentation with live request / response examples.",
         href: "/reference/",
       },
+      {
+        title: "For AI agents",
+        description: "Drop AGENTS.md into your project and your AI coding tools will know how to integrate with Privicore.",
+        href: "/agents.md",
+      },
     ],
   });
   fs.writeFileSync(path.join(input.outDir, "index.html"), base(homeHtml));
@@ -164,6 +170,16 @@ export async function build(input: BuildInput): Promise<void> {
   // unprocessed (and, broadly, skips Jekyll entirely). Harmless on
   // any other host.
   fs.writeFileSync(path.join(input.outDir, ".nojekyll"), "");
+
+  // 7b) agents.md — the AGENTS.md / CLAUDE.md primer integrators drop
+  // into their projects. Served raw (not rendered as HTML) so AI
+  // coding tools and curl both get plain markdown.
+  const agentsSrc = path.join(input.contentDir, "agents.md");
+  if (fs.existsSync(agentsSrc)) {
+    const raw = applySiteConfig(fs.readFileSync(agentsSrc, "utf8"), siteUrls);
+    fs.writeFileSync(path.join(input.outDir, "agents.md"), raw);
+    console.log(`[build] wrote agents.md`);
+  }
 
   // 8) Bundle the AI-agent context: OpenAPI spec + guide markdown in
   // one JSON blob the in-browser launcher fetches at page load. Keeps

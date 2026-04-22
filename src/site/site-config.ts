@@ -15,9 +15,10 @@ export interface SiteUrlConfig {
   wsUrl: string;
   upstreamUrl: string;
   downstreamUrl: string;
+  docsSiteUrl: string;
 }
 
-const TOKENS: Array<keyof SiteUrlConfig> = ["apiUrl", "wsUrl", "upstreamUrl", "downstreamUrl"];
+const TOKENS: Array<keyof SiteUrlConfig> = ["apiUrl", "wsUrl", "upstreamUrl", "downstreamUrl", "docsSiteUrl"];
 
 /** Replace `{{apiUrl}}` / `{{wsUrl}}` / `{{upstreamUrl}}` / `{{downstreamUrl}}`
  *  in the given string with the configured values. */
