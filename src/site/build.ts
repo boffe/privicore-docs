@@ -333,7 +333,7 @@ a:hover { text-decoration: underline; }
   text-decoration: none;
 }
 .topbar-brand img {
-  height: var(--topbar-height);
+  height: calc(var(--topbar-height) - 20px);
   width: auto;
   display: block;
 }
