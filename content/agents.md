@@ -42,10 +42,16 @@ produce silent bugs rather than clean errors.
    produces ghosts: apparent successes that are actually rejections.
 
 2. **A profile must have a registered public key before it can
-   authenticate.** The sequence is: register profile → generate
+   authenticate.** This applies when you're creating the profile
+   yourself from code. The sequence is: register profile → generate
    keypair → register public key → await ack → authenticate. Skip
    the public-key step and `authenticate` returns `401 invalid
    credentials` with no hint about why.
+
+   **If your profile was pre-provisioned for you** (e.g. handed to
+   you as `PRIVICORE_USERNAME` + `PRIVICORE_PASSWORD` by the
+   operator), skip the registration steps — the profile already
+   has a public key on file. Go straight to `authenticate`.
 
 3. **Encrypt client-side before uploading.** The encryption happens
    on your machine with a key you control — not on the server. Wire
@@ -108,6 +114,23 @@ export async function openSession(
 }
 ```
 
+### Parse a commandId from any async response
+
+The server returns async-command identifiers in one of three wire
+shapes depending on the endpoint: a bare string, a single-element
+array, or `{commandId: "..."}`. Normalize once and reuse.
+
+```ts
+export function extractCommandId(body: unknown): string | undefined {
+  if (typeof body === "string") return body.replace(/^"|"$/g, "").trim() || undefined;
+  if (Array.isArray(body)) return typeof body[0] === "string" ? body[0] : undefined;
+  if (body && typeof body === "object" && typeof (body as { commandId?: unknown }).commandId === "string") {
+    return (body as { commandId: string }).commandId;
+  }
+  return undefined;
+}
+```
+
 ### Await an async-command ack
 
 ```ts
@@ -146,11 +169,14 @@ export async function storeData(
   plaintext: Buffer,
   context = "my-app",
 ): Promise<string> {
-  // 1. Reserve token space.
+  // 1. Reserve token space. ttl is in seconds and is bounded — small
+  //    values (e.g. "5") are always accepted; very large values may be
+  //    rejected with 422 depending on server policy.
   const reserve = await postForm(apiUrl, session.token, "/data-token/reserve-token-space", {
-    context, ttl: "3600",
+    context, ttl: "5",
   });
-  const { commandId } = await reserve.json();
+  const commandId = extractCommandId(await reserve.json());
+  if (!commandId) throw new Error("reserve-token-space: no commandId in response");
   await awaitCommand(session.ws, commandId);
 
   // 2. Retrieve temporary token.
@@ -171,9 +197,13 @@ export async function storeData(
     temporaryTokenSpace: tmpToken,
     data: wire.toString("base64"),
   });
-  await awaitCommand(session.ws, (await exchange.json()).commandId);
+  const exchangeCmd = extractCommandId(await exchange.json());
+  if (!exchangeCmd) throw new Error("exchange-data-for-token: no commandId");
+  await awaitCommand(session.ws, exchangeCmd);
 
-  // 5. Commit metadata → permanent data token.
+  // 5. Commit metadata → permanent data token. This step promotes the
+  //    ephemeral `tmp-…` token to a durable `dtk-…` handle. Skip it and
+  //    the row expires with the TTL you set in step 1.
   const meta = await postForm(apiUrl, session.token, "/data-token/configure-file-meta", {
     token: tmpToken,
     fileName: "payload.bin",
@@ -261,6 +291,61 @@ async function getJson(apiUrl: string, token: string, path: string): Promise<any
 }
 ```
 
+## WebSocket messages
+
+After `joinChannel` succeeds, the server sends exactly these message
+types over the same socket. Your handler dispatches on
+`message.data.type`:
+
+| Type | When it arrives | Correlate by | Key fields |
+| --- | --- | --- | --- |
+| `X-DPT-CAB-ID` | After any async-command HTTP call (`202` response) | `message.data.id === commandId` | `command_status` (2 success / 3 rejected), `body` |
+| `X-DPT-CAB-REQUEST-ID` | After `request-data` or other async-request HTTP calls. The correlation id comes back in the HTTP response's `x-dpt-cab-request-id` header, NOT the JSON body. | `message.data.id === requestId` | `body` (base64 for inline payloads), `output_type` (0 inline / 1 streamed) |
+| `STREAM-READY` | During large-payload retrieval (`output_type === 1`). Tells you a streaming URL is ready. | `message.data.requestId` | `streamUrl` — open a second WebSocket there for the binary frames |
+
+Messages you don't care about — join acks, keepalives, telemetry —
+are safe to ignore. Always dispatch on `message.data.type` and
+return early for anything unrecognised.
+
+## Authorization token lifetime
+
+- `authenticate` returns `authorizationToken` with an `expiresAt`
+  timestamp. Treat the token as opaque — you must read `expiresAt`
+  from the response, not parse the token.
+- Tokens are typically valid for several hours. Re-authenticate
+  (or call `/profile/reauthorize-authorization-token` to refresh)
+  when you're within ~60 seconds of expiry.
+- `/profile/authorization-token/expiry` (POST, empty body, auth'd)
+  returns `{expiresAt}` for the current token if you need to check
+  mid-session.
+- A revoked or expired token shows up as `401 invalid token` on
+  any authenticated endpoint. Recover by calling `authenticate`
+  again and replaying the failed call; do not retry a bare HTTP
+  failure.
+
+## Error recovery
+
+- **`command_status: 3` in a WebSocket ack.** The command was
+  rejected. `message.data.body` is a short string explaining why
+  (missing field, wrong owner, policy denied, etc.). Surface the
+  string to logs, fail the calling operation, do NOT retry with
+  the same inputs — retries will hit the same rejection. Fix the
+  input or the prerequisite state (register missing device,
+  satisfy a policy, etc.) before trying again.
+- **No ack arrives within your timeout.** The most common cause
+  is ordering: the WebSocket `joinChannel` must complete before
+  the HTTP call that produces the ack. Second most common:
+  multiple WebSocket connections and the ack landed on a
+  different one. Re-run with a single shared socket and check
+  timings.
+- **`401 invalid token` mid-session.** Treat as expected — tokens
+  rotate. Re-authenticate once, replay the call. If it fails a
+  second time, the credentials or profile state are wrong.
+- **`422` on a reserve-token-space, exchange-data-for-token, or
+  any write endpoint.** The body will usually contain a field
+  name or machine-readable reason. Validate inputs against the
+  OpenAPI spec at `{{docsSiteUrl}}/openapi.json` — don't guess.
+
 ## Always
 
 - **Subscribe to the WebSocket BEFORE** issuing the HTTP command whose
@@ -271,13 +356,17 @@ async function getJson(apiUrl: string, token: string, path: string): Promise<any
 - Persist the permanent `dtk-…` token in your application database as
   the handle for each stored record.
 - Generate a fresh 12-byte IV for every payload — never reuse.
-- Register the profile's public key before calling `authenticate`.
+- If you're provisioning a profile yourself, register its public key
+  before calling `authenticate`. If the profile was handed to you
+  ready-to-use, skip provisioning and go straight to `authenticate`.
 
 ## Never
 
 - Don't parse the `T-…` authorization token; treat it as opaque.
-- Don't skip the public-key registration step — the profile is inert
-  without it.
+- Don't skip the public-key registration step when provisioning a
+  brand-new profile — the profile is inert until its public key
+  lands. (When the profile was pre-provisioned by someone else,
+  this step was already done.)
 - Don't upload plaintext. The threat model requires client-side
   encryption.
 - Don't poll when you could subscribe. Polling is for one-shot
