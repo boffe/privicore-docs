@@ -42,7 +42,7 @@ export function renderHomePage(input: HomePageInput): string {
 </head>
 <body>
   <header class="topbar">
-    <div class="topbar-brand"><a href="/">${escapeHtml(input.siteTitle)}</a></div>
+    <div class="topbar-brand"><a href="/"><img src="/images/privicore-logo.png" alt="">${escapeHtml(input.siteTitle)}</a></div>
     <nav class="topbar-nav">
       ${topBar}
       ${THEME_TOGGLE_BUTTON}

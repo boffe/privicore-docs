@@ -327,6 +327,15 @@ a:hover { text-decoration: underline; }
   color: var(--color-text);
   font-weight: 600;
   font-size: 1.05rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+.topbar-brand img {
+  height: 28px;
+  width: auto;
+  display: block;
 }
 .topbar-nav { display: flex; gap: 18px; }
 .topbar-link { color: var(--color-muted); font-size: 0.95rem; }

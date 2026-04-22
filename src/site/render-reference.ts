@@ -175,7 +175,7 @@ export function renderReferenceShell(opts: ReferenceShellOptions): string {
 <body>
   <header class="topbar">
     <div class="topbar-brand">
-      <a href="/">${escapeHtml(opts.title)}</a>
+      <a href="/"><img src="/images/privicore-logo.png" alt="">${escapeHtml(opts.title)}</a>
     </div>
     <nav class="topbar-nav">
       ${topBar}
