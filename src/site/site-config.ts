@@ -44,3 +44,36 @@ export function applySiteConfigDeep<T>(value: T, cfg: SiteUrlConfig): T {
   }
   return value;
 }
+
+/**
+ * Rewrite absolute site paths to include a base path. Used when the
+ * site is hosted at a sub-path (e.g. boffe.github.io/privicore-docs/)
+ * rather than a domain root. Targets only our own path prefixes —
+ * leaves external URLs and arbitrary absolute paths in prose alone.
+ *
+ * Matches occurrences of `/guides/`, `/reference/`, `/assets/`,
+ * `/images/`, `/openapi.json` that appear after a context character
+ * (quote, paren, `=`, whitespace) so we don't accidentally rewrite
+ * the middle of a longer URL or a regex pattern.
+ */
+const SITE_PATH_PREFIXES = [
+  "/guides/",
+  "/reference/",
+  "/assets/",
+  "/images/",
+  "/openapi.json",
+];
+export function applyBasePath(content: string, basePath: string): string {
+  if (!basePath) return content;
+  let out = content;
+  for (const root of SITE_PATH_PREFIXES) {
+    const escaped = root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // Contextual boundary: quote, paren, equals, whitespace, or parenthesis.
+    const re = new RegExp(`(["'(\\s=])${escaped}`, "g");
+    out = out.replace(re, `$1${basePath}${root}`);
+  }
+  // Site-root link (topbar brand, "back to home"): exact `href="/"`.
+  out = out.replaceAll('href="/"', `href="${basePath}/"`);
+  out = out.replaceAll("href='/'", `href='${basePath}/'`);
+  return out;
+}

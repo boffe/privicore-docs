@@ -10,7 +10,11 @@
  */
 
 const STORAGE_KEY = "privicore-docs-anthropic-key";
-const CONTEXT_URL = "/assets/ai-context.json";
+// Resolve relative to this script's URL so the launcher works under
+// any base path (e.g. when the site is hosted at user.github.io/repo/).
+// This file lives at <base>/assets/ai-agent/launcher.js; the context
+// bundle is at <base>/assets/ai-context.json — one level up.
+const CONTEXT_URL = new URL("../ai-context.json", import.meta.url).href;
 
 /** Fetched lazily on first panel open. */
 let contextPromise = null;

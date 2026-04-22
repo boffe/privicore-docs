@@ -53,6 +53,7 @@ jobs:
           DOCS_WS_URL: ${{ vars.DOCS_WS_URL }}
           DOCS_UPSTREAM_URL: ${{ vars.DOCS_UPSTREAM_URL }}
           DOCS_DOWNSTREAM_URL: ${{ vars.DOCS_DOWNSTREAM_URL }}
+          DOCS_BASE_PATH: ${{ vars.DOCS_BASE_PATH }}
         run: npm run build
 
       - uses: actions/upload-pages-artifact@v3

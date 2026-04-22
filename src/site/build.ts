@@ -22,7 +22,7 @@ import type { DocSet } from "../ir/types.ts";
 import { renderReferenceShell } from "./render-reference.ts";
 import { renderGuidePage, type GuideMeta } from "./render-guide.ts";
 import { renderHomePage } from "./render-home.ts";
-import { applySiteConfig, applySiteConfigDeep, type SiteUrlConfig } from "./site-config.ts";
+import { applyBasePath, applySiteConfig, applySiteConfigDeep, type SiteUrlConfig } from "./site-config.ts";
 
 const DEFAULT_CSS_PATH = "src/site/shell.css";
 
@@ -48,7 +48,12 @@ export async function build(input: BuildInput): Promise<void> {
     upstreamUrl: cfg.docsUpstreamUrl,
     downstreamUrl: cfg.docsDownstreamUrl,
   };
+  const basePath = cfg.docsBasePath;
+  // Prefixes our own absolute paths with the basePath (if any).
+  // No-op when the site is hosted at a domain root.
+  const base = (s: string) => applyBasePath(s, basePath);
   console.log(`[build] site urls: api=${siteUrls.apiUrl}  ws=${siteUrls.wsUrl}`);
+  if (basePath) console.log(`[build] base path: ${basePath}`);
 
   // Clean + create dist/
   if (fs.existsSync(input.outDir)) fs.rmSync(input.outDir, { recursive: true, force: true });
@@ -62,7 +67,7 @@ export async function build(input: BuildInput): Promise<void> {
   const docSet = applySiteConfigDeep(rawDocSet, siteUrls);
   const spec = toOpenApi(docSet, { title: siteTitle, appendPhaseFooter: true });
   const specPath = path.join(input.outDir, "openapi.json");
-  fs.writeFileSync(specPath, JSON.stringify(spec, null, 2));
+  fs.writeFileSync(specPath, base(JSON.stringify(spec, null, 2)));
   console.log(`[build] wrote ${specPath} (${Object.keys(spec.paths).length} paths)`);
 
   // 2) Reference (Scalar) shell.
@@ -75,7 +80,7 @@ export async function build(input: BuildInput): Promise<void> {
     specUrl: "/openapi.json",
     topBarLinks,
   });
-  fs.writeFileSync(path.join(input.outDir, "reference", "index.html"), referenceHtml);
+  fs.writeFileSync(path.join(input.outDir, "reference", "index.html"), base(referenceHtml));
   console.log(`[build] wrote reference/index.html`);
 
   // 3) Guide pages. Read and URL-substitute each guide once; reused
@@ -97,7 +102,7 @@ export async function build(input: BuildInput): Promise<void> {
       allGuides: guideMetas,
       topBarLinks,
     });
-    fs.writeFileSync(path.join(input.outDir, "guides", `${meta.slug}.html`), html);
+    fs.writeFileSync(path.join(input.outDir, "guides", `${meta.slug}.html`), base(html));
     console.log(`[build] wrote guides/${meta.slug}.html`);
   }
 
@@ -138,7 +143,7 @@ export async function build(input: BuildInput): Promise<void> {
       },
     ],
   });
-  fs.writeFileSync(path.join(input.outDir, "index.html"), homeHtml);
+  fs.writeFileSync(path.join(input.outDir, "index.html"), base(homeHtml));
   console.log(`[build] wrote index.html`);
 
   // 5) Copy shared CSS.
@@ -175,7 +180,7 @@ export async function build(input: BuildInput): Promise<void> {
     })),
     generatedAt: new Date().toISOString(),
   };
-  fs.writeFileSync(path.join(input.outDir, "assets", "ai-context.json"), JSON.stringify(aiContext));
+  fs.writeFileSync(path.join(input.outDir, "assets", "ai-context.json"), base(JSON.stringify(aiContext)));
   console.log(`[build] wrote assets/ai-context.json (${guideMetas.length} guides + ${Object.keys(spec.paths).length} endpoints)`);
 
   console.log(`\n[build] done — site at ${input.outDir}/`);
