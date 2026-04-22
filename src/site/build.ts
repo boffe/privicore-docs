@@ -95,12 +95,20 @@ export async function build(input: BuildInput): Promise<void> {
       applySiteConfig(fs.readFileSync(path.join(guidesDir, `${meta.slug}.md`), "utf8"), siteUrls),
     );
   }
+
+  // Sidebar also links out to the AGENTS.md primer — it's a guide in
+  // spirit even though it lives at /agents.md rather than under /guides/.
+  const sidebarMetas: GuideMeta[] = [
+    ...guideMetas,
+    { slug: "agents", title: "For AI agents (AGENTS.md)", href: "/agents.md" },
+  ];
+
   for (const meta of guideMetas) {
     const html = renderGuidePage({
       siteTitle,
       guide: meta,
       markdown: guideMarkdown.get(meta.slug)!,
-      allGuides: guideMetas,
+      allGuides: sidebarMetas,
       topBarLinks,
     });
     fs.writeFileSync(path.join(input.outDir, "guides", `${meta.slug}.html`), base(html));

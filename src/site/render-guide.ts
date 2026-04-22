@@ -89,6 +89,9 @@ export interface GuideMeta {
   title: string;
   /** Relative path to the markdown source, for "edit this page" links. */
   sourcePath?: string;
+  /** Override the default `/guides/{slug}.html` URL. Used for sidebar
+   *  entries that point outside the guides/ tree (e.g. agents.md). */
+  href?: string;
 }
 
 export interface GuideRenderInput {
@@ -107,7 +110,8 @@ export function renderGuidePage(input: GuideRenderInput): string {
   ).join("\n      ");
   const sidebarItems = input.allGuides.map((g) => {
     const active = g.slug === input.guide.slug ? ' class="active"' : "";
-    return `<li${active}><a href="/guides/${escapeHtml(g.slug)}.html">${escapeHtml(g.title)}</a></li>`;
+    const href = g.href ?? `/guides/${g.slug}.html`;
+    return `<li${active}><a href="${escapeHtml(href)}">${escapeHtml(g.title)}</a></li>`;
   }).join("\n      ");
 
   return `<!doctype html>
